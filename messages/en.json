@@ -1,0 +1,171 @@
+{
+  "common": {
+    "appName": "Meavo Stock",
+    "tagline": "AI-powered invoice scanning",
+    "loading": "Loading...",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "approve": "Approve",
+    "reject": "Reject",
+    "retry": "Retry",
+    "back": "Back",
+    "next": "Next",
+    "yes": "Yes",
+    "no": "No",
+    "search": "Search",
+    "filter": "Filter",
+    "all": "All",
+    "language": "Language",
+    "signIn": "Sign in",
+    "signOut": "Sign out",
+    "draft": "Draft",
+    "approved": "Approved",
+    "synced": "Synced",
+    "syncFailed": "Sync failed",
+    "pendingReview": "Pending review",
+    "currency": "Currency",
+    "amount": "Amount",
+    "date": "Date",
+    "details": "Details"
+  },
+  "nav": {
+    "home": "Home",
+    "scan": "Scan",
+    "documents": "Documents",
+    "admin": "Admin",
+    "zeron": "Zeron"
+  },
+  "auth": {
+    "title": "Sign in to Meavo Stock",
+    "subtitle": "Sign in with your company Google account.",
+    "google": "Continue with Google",
+    "signedInAs": "Signed in as {email}",
+    "signOut": "Sign out",
+    "errorTitle": "Sign-in failed",
+    "tryAgain": "Try again"
+  },
+  "home": {
+    "welcome": "Welcome to Meavo Stock",
+    "description": "Photograph an invoice, proforma, or delivery note with your phone. AI will extract the data for you to review and approve.",
+    "ctaScan": "Scan a document",
+    "ctaList": "View all documents",
+    "stats": {
+      "pending": "Pending review",
+      "approved": "Approved",
+      "synced": "Synced",
+      "syncFailed": "Sync failed"
+    }
+  },
+  "scan": {
+    "title": "Scan a document",
+    "subtitle": "Photograph or upload an invoice, proforma, or delivery note.",
+    "captureCamera": "Take a photo",
+    "captureGallery": "Pick from gallery",
+    "uploadDrag": "Drop a file here or",
+    "uploadBrowse": "browse",
+    "uploadHint": "JPG, PNG or PDF up to 50 MB",
+    "pasteHint": "Or paste an image with Ctrl/Cmd+V.",
+    "documentTypeLabel": "Document type",
+    "documentType": {
+      "invoice": "Invoice",
+      "proforma": "Proforma",
+      "delivery_note": "Delivery note",
+      "auto": "Auto-detect"
+    },
+    "uploading": "Uploading...",
+    "extracting": "AI extracting data...",
+    "uploadAnother": "Upload another",
+    "errorUpload": "Upload failed",
+    "errorExtract": "AI extraction failed",
+    "successTitle": "Done",
+    "successDescription": "The document has been uploaded and processed. Review and approve."
+  },
+  "documents": {
+    "title": "Documents",
+    "subtitle": "All scanned documents.",
+    "empty": "No scanned documents yet.",
+    "columns": {
+      "number": "Number",
+      "type": "Type",
+      "supplier": "Supplier",
+      "issueDate": "Date",
+      "total": "Total",
+      "zone": "Zone",
+      "status": "Status"
+    },
+    "filterStatus": "Status",
+    "filterType": "Type"
+  },
+  "review": {
+    "title": "Review extracted data",
+    "lowConfidence": "AI is uncertain — please verify",
+    "aiSuggested": "AI suggested: {value}",
+    "sections": {
+      "header": "Header",
+      "supplier": "Supplier",
+      "lineItems": "Line items",
+      "totals": "Totals & VAT",
+      "zone": "Delivery zone"
+    },
+    "fields": {
+      "documentNumber": "Document number",
+      "issueDate": "Issue date",
+      "dueDate": "Due date",
+      "deliveryDate": "Delivery date",
+      "supplierName": "Supplier name",
+      "supplierVat": "VAT number",
+      "supplierEik": "EIK / Company ID",
+      "supplierCountry": "Supplier country",
+      "supplierAddress": "Address",
+      "currency": "Currency",
+      "subtotal": "Subtotal",
+      "vatTotal": "VAT amount",
+      "total": "Total",
+      "vatRate": "VAT %",
+      "deliveryZone": "Zone",
+      "customsRef": "Customs declaration (MRN/MDD)"
+    },
+    "lineItem": {
+      "position": "#",
+      "name": "Item",
+      "sku": "SKU",
+      "quantity": "Qty",
+      "unit": "Unit",
+      "unitPrice": "Unit price",
+      "vatRate": "VAT %",
+      "lineTotal": "Line total"
+    },
+    "addLine": "Add line",
+    "removeLine": "Remove",
+    "duplicateLine": "Duplicate",
+    "saveDraft": "Save draft",
+    "approveAndSync": "Approve & sync",
+    "rejectDocument": "Reject document",
+    "approvedAt": "Approved on {date}"
+  },
+  "deliveryZone": {
+    "local": "Local (Bulgaria)",
+    "eu": "Intra-community (EU)",
+    "non_eu": "Import (non-EU)",
+    "localHelp": "20% Bulgarian VAT charged by the supplier — standard input VAT.",
+    "euHelp": "Reverse-charge VAT (Protocol per art. 117 of VAT Act).",
+    "non_euHelp": "Import — customs duty and import VAT at clearance; customs declaration (MRN) required."
+  },
+  "admin": {
+    "zeron": {
+      "title": "Zeron sync",
+      "subtitle": "Review successful and failed sync attempts.",
+      "currentAdapter": "Current adapter",
+      "adapter": {
+        "stub": "Off (log only)",
+        "export": "Manual XLSX/XML export",
+        "api": "Zeron API",
+        "agent": "Desktop agent"
+      },
+      "syncedAt": "Synced at {date}",
+      "retry": "Retry"
+    }
+  }
+}

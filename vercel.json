@@ -1,0 +1,13 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "regions": ["fra1"],
+  "framework": "nextjs",
+  "functions": {
+    "src/app/api/scan/extract/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/zeron/sync/route.ts": {
+      "maxDuration": 30
+    }
+  }
+}

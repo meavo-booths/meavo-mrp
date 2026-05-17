@@ -1,0 +1,171 @@
+{
+  "common": {
+    "appName": "Meavo Stock",
+    "tagline": "Сканиране и обработка на фактури с AI",
+    "loading": "Зареждане...",
+    "save": "Запазване",
+    "cancel": "Отказ",
+    "delete": "Изтриване",
+    "edit": "Редакция",
+    "approve": "Одобри",
+    "reject": "Откажи",
+    "retry": "Опитай пак",
+    "back": "Назад",
+    "next": "Напред",
+    "yes": "Да",
+    "no": "Не",
+    "search": "Търсене",
+    "filter": "Филтър",
+    "all": "Всички",
+    "language": "Език",
+    "signIn": "Вход",
+    "signOut": "Изход",
+    "draft": "Чернова",
+    "approved": "Одобрено",
+    "synced": "Синхронизирано",
+    "syncFailed": "Грешка при синхронизация",
+    "pendingReview": "За преглед",
+    "currency": "Валута",
+    "amount": "Сума",
+    "date": "Дата",
+    "details": "Детайли"
+  },
+  "nav": {
+    "home": "Начало",
+    "scan": "Сканирай",
+    "documents": "Документи",
+    "admin": "Админ",
+    "zeron": "Zeron"
+  },
+  "auth": {
+    "title": "Вход в Meavo Stock",
+    "subtitle": "Влезте с фирмения си Google акаунт.",
+    "google": "Вход с Google",
+    "signedInAs": "Вписан като {email}",
+    "signOut": "Изход",
+    "errorTitle": "Неуспешен вход",
+    "tryAgain": "Опитайте пак"
+  },
+  "home": {
+    "welcome": "Добре дошли в Meavo Stock",
+    "description": "Сканирайте фактура, проформа или стокова разписка с телефона си. AI ще извлече данните, които можете да прегледате и одобрите.",
+    "ctaScan": "Сканирай документ",
+    "ctaList": "Виж всички документи",
+    "stats": {
+      "pending": "За преглед",
+      "approved": "Одобрени",
+      "synced": "Синхронизирани",
+      "syncFailed": "С грешка"
+    }
+  },
+  "scan": {
+    "title": "Сканиране на документ",
+    "subtitle": "Снимайте или качете фактура, проформа или стокова разписка.",
+    "captureCamera": "Снимка с камера",
+    "captureGallery": "Избор от галерия",
+    "uploadDrag": "Пуснете файла тук или",
+    "uploadBrowse": "изберете файл",
+    "uploadHint": "JPG, PNG или PDF до 50 MB",
+    "pasteHint": "Можете и да поставите изображение с Ctrl/Cmd+V.",
+    "documentTypeLabel": "Тип на документа",
+    "documentType": {
+      "invoice": "Фактура",
+      "proforma": "Проформа",
+      "delivery_note": "Стокова разписка",
+      "auto": "Автоматично разпознаване"
+    },
+    "uploading": "Качване...",
+    "extracting": "AI извлича данни...",
+    "uploadAnother": "Качи друг",
+    "errorUpload": "Грешка при качването",
+    "errorExtract": "AI не успя да извлече данни",
+    "successTitle": "Готово",
+    "successDescription": "Документът е качен и обработен. Прегледайте и одобрете."
+  },
+  "documents": {
+    "title": "Документи",
+    "subtitle": "Всички сканирани документи.",
+    "empty": "Все още няма сканирани документи.",
+    "columns": {
+      "number": "Номер",
+      "type": "Тип",
+      "supplier": "Доставчик",
+      "issueDate": "Дата",
+      "total": "Сума",
+      "zone": "Зона",
+      "status": "Статус"
+    },
+    "filterStatus": "Статус",
+    "filterType": "Тип"
+  },
+  "review": {
+    "title": "Преглед на извлечените данни",
+    "lowConfidence": "AI несигурен — моля, проверете",
+    "aiSuggested": "AI предложи: {value}",
+    "sections": {
+      "header": "Общи данни",
+      "supplier": "Доставчик",
+      "lineItems": "Редове",
+      "totals": "Суми и ДДС",
+      "zone": "Зона на доставка"
+    },
+    "fields": {
+      "documentNumber": "Номер на документа",
+      "issueDate": "Дата на издаване",
+      "dueDate": "Падеж",
+      "deliveryDate": "Дата на доставка",
+      "supplierName": "Име на доставчика",
+      "supplierVat": "ДДС номер / VAT",
+      "supplierEik": "ЕИК",
+      "supplierCountry": "Държава на доставчика",
+      "supplierAddress": "Адрес",
+      "currency": "Валута",
+      "subtotal": "Сума без ДДС",
+      "vatTotal": "ДДС",
+      "total": "Обща сума",
+      "vatRate": "ДДС %",
+      "deliveryZone": "Зона",
+      "customsRef": "Митническа декларация (МДД/МАД)"
+    },
+    "lineItem": {
+      "position": "№",
+      "name": "Артикул",
+      "sku": "Код",
+      "quantity": "К-во",
+      "unit": "Мярка",
+      "unitPrice": "Ед. цена",
+      "vatRate": "ДДС %",
+      "lineTotal": "Сума"
+    },
+    "addLine": "Добави ред",
+    "removeLine": "Премахни",
+    "duplicateLine": "Дубликирай",
+    "saveDraft": "Запази черновата",
+    "approveAndSync": "Одобри и синхронизирай",
+    "rejectDocument": "Откажи документа",
+    "approvedAt": "Одобрено на {date}"
+  },
+  "deliveryZone": {
+    "local": "Местен (България)",
+    "eu": "Вътреобщностна (ЕС)",
+    "non_eu": "Внос (извън ЕС)",
+    "localHelp": "20% ДДС, начислено от доставчика — стандартно облагаем внос.",
+    "euHelp": "Обратно начисляване на ДДС (Протокол по чл. 117).",
+    "non_euHelp": "Внос — митническо мито и ДДС при освобождаване; нужна е митническа декларация (МДД/МАД)."
+  },
+  "admin": {
+    "zeron": {
+      "title": "Zeron синхронизация",
+      "subtitle": "Преглед на изпратените и неуспешни синхронизации.",
+      "currentAdapter": "Текущ адаптер",
+      "adapter": {
+        "stub": "Изключено (само лог)",
+        "export": "Ръчен експорт XLSX/XML",
+        "api": "Zeron API",
+        "agent": "Десктоп агент"
+      },
+      "syncedAt": "Синхронизирано в {date}",
+      "retry": "Опитай пак"
+    }
+  }
+}

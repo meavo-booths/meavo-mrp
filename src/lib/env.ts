@@ -1,0 +1,76 @@
+import "server-only";
+
+import { z } from "zod";
+
+const ServerEnvSchema = z.object({
+  NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+
+  NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3000"),
+  NEXT_PUBLIC_SUPABASE_URL: z.string().url(),
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(20),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().min(20).optional(),
+
+  DATABASE_URL: z.string().min(10).optional(),
+  DIRECT_DATABASE_URL: z.string().min(10).optional(),
+
+  SUPABASE_BUCKET_ORIGINALS: z.string().default("originals"),
+  SUPABASE_BUCKET_THUMBNAILS: z.string().default("thumbnails"),
+
+  GEMINI_API_KEY: z.string().min(10).optional(),
+  GEMINI_MODEL: z.string().default("gemini-2.5-flash"),
+  GEMINI_THINKING_BUDGET: z.coerce.number().int().min(0).max(8192).default(0),
+
+  ZERON_ADAPTER: z
+    .enum(["stub", "export", "api", "agent"])
+    .default("stub"),
+  ZERON_API_BASE_URL: z.string().optional(),
+  ZERON_API_KEY: z.string().optional(),
+  ZERON_EXPORT_EMAIL: z.string().optional(),
+});
+
+export type ServerEnv = z.infer<typeof ServerEnvSchema>;
+
+function loadEnv(): ServerEnv {
+  const parsed = ServerEnvSchema.safeParse(process.env);
+  if (!parsed.success) {
+    const issues = parsed.error.issues
+      .map((i) => `  - ${i.path.join(".")}: ${i.message}`)
+      .join("\n");
+    throw new Error(
+      `Invalid server environment variables. See .env.example.\n${issues}`,
+    );
+  }
+  return parsed.data;
+}
+
+/**
+ * Lazily-validated server-side environment variables.
+ *
+ * The validation is intentionally permissive at construction time — many
+ * variables are optional so that local builds work before Supabase is wired.
+ */
+export const env: ServerEnv = (() => {
+  try {
+    return loadEnv();
+  } catch (e) {
+    // Print once at startup but do not crash the build.
+    // Routes that require missing values will throw with clearer errors.
+    if (process.env.NODE_ENV !== "production") {
+       
+      console.warn(
+        "[meavo-stock] env warning:",
+        (e as Error).message.split("\n")[0],
+      );
+    }
+    return ServerEnvSchema.parse({
+      NODE_ENV: process.env.NODE_ENV ?? "development",
+      NEXT_PUBLIC_APP_URL:
+        process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
+      NEXT_PUBLIC_SUPABASE_URL:
+        process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://placeholder.supabase.co",
+      NEXT_PUBLIC_SUPABASE_ANON_KEY:
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+        "placeholder_anon_key_at_least_twenty_characters_long",
+    });
+  }
+})();
