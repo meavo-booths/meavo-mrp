@@ -3,8 +3,8 @@ import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 
+import { invoiceScannerDisabledResponse, requireApiUser } from "@/lib/api/guard";
 import { db, schema } from "@/lib/db/client";
-import { getSessionUser } from "@/lib/auth/session";
 import { buildOriginalPath, uploadOriginal } from "@/lib/storage/buckets";
 import { sha256Hex } from "@/lib/utils/hash";
 import { sanitizeFilename } from "@/lib/utils/sanitize-filename";
@@ -28,8 +28,10 @@ const MAX_BYTES = 25 * 1024 * 1024;
 
 /** POST /api/documents — multipart/form-data: file=<File>, typeHint=<...>. */
 export async function POST(request: Request) {
-  const user = await getSessionUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const disabled = invoiceScannerDisabledResponse();
+  if (disabled) return disabled;
+  const { user, error } = await requireApiUser();
+  if (error) return error;
 
   const form = await request.formData();
   const file = form.get("file");
@@ -73,29 +75,49 @@ export async function POST(request: Request) {
     filename: safeName,
   });
 
-  await uploadOriginal(path, bytes, file.type);
+  try {
+    await uploadOriginal(path, bytes, file.type);
+  } catch (e) {
+    const msg = (e as Error).message;
+    console.error("[documents:POST] storage upload failed:", e);
+    return NextResponse.json(
+      { error: "Storage upload failed: " + msg },
+      { status: 500 },
+    );
+  }
 
   // Map "auto" hint to a sensible default before INSERT (NOT NULL column).
   const initialType = typeHint === "auto" ? "invoice" : typeHint;
 
-  await db.insert(schema.documents).values({
-    id: documentId,
-    type: initialType,
-    status: "pending_review",
-    originalFilePath: path,
-    originalMimeType: file.type,
-    originalSizeBytes: file.size,
-    contentHash,
-    createdBy: user.id,
-  });
+  try {
+    await db.insert(schema.documents).values({
+      id: documentId,
+      type: initialType,
+      status: "pending_review",
+      originalFilePath: path,
+      originalMimeType: file.type,
+      originalSizeBytes: file.size,
+      contentHash,
+      createdBy: user.id,
+    });
+  } catch (e) {
+    const msg = (e as Error).message;
+    console.error("[documents:POST] DB insert failed:", e);
+    return NextResponse.json(
+      { error: "Failed to save document row: " + msg },
+      { status: 500 },
+    );
+  }
 
   return NextResponse.json({ id: documentId });
 }
 
 /** GET /api/documents — list documents for the current user. */
 export async function GET() {
-  const user = await getSessionUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const disabled = invoiceScannerDisabledResponse();
+  if (disabled) return disabled;
+  const { user, error } = await requireApiUser();
+  if (error) return error;
 
   const rows = await db.query.documents.findMany({
     where: eq(schema.documents.createdBy, user.id),

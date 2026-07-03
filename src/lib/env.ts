@@ -58,7 +58,7 @@ export const env: ServerEnv = (() => {
     if (process.env.NODE_ENV !== "production") {
        
       console.warn(
-        "[meavo-stock] env warning:",
+        "[meavo-mrp] env warning:",
         (e as Error).message.split("\n")[0],
       );
     }

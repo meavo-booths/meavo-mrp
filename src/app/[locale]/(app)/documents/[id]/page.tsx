@@ -1,9 +1,10 @@
 import { setRequestLocale, getTranslations } from "next-intl/server";
-import { redirect, notFound } from "next/navigation";
+import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
 
 import { db, schema } from "@/lib/db/client";
-import { getSessionUser } from "@/lib/auth/session";
+import { requireSessionUser } from "@/lib/auth/session";
+import { isInvoiceScannerEnabled } from "@/lib/features";
 import { getOriginalSignedUrl } from "@/lib/storage/buckets";
 import { buildDefaultsFromDocument } from "@/lib/extractor/from-document";
 import type { ConfidenceMap } from "@/lib/extractor/schema";
@@ -21,13 +22,8 @@ export default async function DocumentPage({
 }) {
   const { locale, id } = await params;
   setRequestLocale(locale);
-
-  const user = await getSessionUser();
-  if (!user) {
-    redirect(
-      `/${locale}/login?next=${encodeURIComponent(`/${locale}/documents/${id}`)}`,
-    );
-  }
+  if (!isInvoiceScannerEnabled()) notFound();
+  const user = await requireSessionUser();
 
   const doc = await db.query.documents.findFirst({
     where: eq(schema.documents.id, id),

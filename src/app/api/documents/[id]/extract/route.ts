@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 
+import { invoiceScannerDisabledResponse, requireApiUser } from "@/lib/api/guard";
 import { db, schema } from "@/lib/db/client";
-import { getSessionUser } from "@/lib/auth/session";
 import { downloadOriginalBytes } from "@/lib/storage/buckets";
 import { extractDocument } from "@/lib/extractor";
 import { inferDeliveryZoneFromCountryCode } from "@/lib/extractor/zone";
@@ -23,8 +23,10 @@ export async function POST(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const user = await getSessionUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const disabled = invoiceScannerDisabledResponse();
+  if (disabled) return disabled;
+  const { user, error } = await requireApiUser();
+  if (error) return error;
   const { id } = await params;
 
   const document = await db.query.documents.findFirst({
@@ -35,20 +37,40 @@ export async function POST(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const bytes = await downloadOriginalBytes(document.originalFilePath);
+  let bytes: Uint8Array;
+  try {
+    bytes = await downloadOriginalBytes(document.originalFilePath);
+  } catch (e) {
+    const msg = (e as Error).message;
+    console.error("[extract] storage download failed:", msg);
+    return NextResponse.json(
+      { error: "Could not load original file from storage: " + msg },
+      { status: 500 },
+    );
+  }
 
   // Look up supplier hints if we already have a candidate from a previous run.
   const supplierProfile = document.supplierId
     ? await loadSupplierProfileHints(document.supplierId)
     : undefined;
 
-  const result = await extractDocument({
-    bytes,
-    mimeType: document.originalMimeType ?? "image/jpeg",
-    typeHint: "auto",
-    supplier: supplierProfile,
-    locale: "bg",
-  });
+  let result;
+  try {
+    result = await extractDocument({
+      bytes,
+      mimeType: document.originalMimeType ?? "image/jpeg",
+      typeHint: "auto",
+      supplier: supplierProfile,
+      locale: "bg",
+    });
+  } catch (e) {
+    const msg = (e as Error).message;
+    console.error("[extract] AI extraction failed:", e);
+    return NextResponse.json(
+      { error: "AI extraction failed: " + msg },
+      { status: 500 },
+    );
+  }
 
   // Try to match (or create) a supplier from the extracted fields.
   let supplierId: string | null = document.supplierId ?? null;
@@ -69,7 +91,8 @@ export async function POST(
     ext.deliveryZone ??
     inferDeliveryZoneFromCountryCode(ext.supplier?.countryCode ?? null);
 
-  await db
+  try {
+    await db
     .update(schema.documents)
     .set({
       type: ext.type,
@@ -110,5 +133,13 @@ export async function POST(
     );
   }
 
-  return NextResponse.json({ ok: true, provider: result.provider });
+    return NextResponse.json({ ok: true, provider: result.provider });
+  } catch (e) {
+    const msg = (e as Error).message;
+    console.error("[extract] DB persist failed:", e);
+    return NextResponse.json(
+      { error: "Failed to save extraction: " + msg },
+      { status: 500 },
+    );
+  }
 }

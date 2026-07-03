@@ -1,8 +1,8 @@
 {
-  "name": "meavo-stock",
+  "name": "meavo-mrp",
   "version": "0.1.0",
   "private": true,
-  "description": "Meavo Stock - AI invoice scanner & Zeron sync (Bulgarian-first PWA)",
+  "description": "Meavo MRP - AI invoice scanner & Zeron sync (Bulgarian-first PWA)",
   "scripts": {
     "dev": "next dev --webpack",
     "build": "next build --webpack",
@@ -52,6 +52,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv": "^17.4.2",
     "drizzle-kit": "^0.28.1",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",

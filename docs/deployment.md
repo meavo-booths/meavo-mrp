@@ -24,8 +24,8 @@ This document covers two deploys:
 ### Steps
 
 ```bash
-git clone <your-repo-url> meavo-stock
-cd meavo-stock
+git clone <your-repo-url> meavo-mrp
+cd meavo-mrp
 pnpm install
 cp .env.example .env.local
 # fill in real values from Supabase / Google AI Studio

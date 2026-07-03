@@ -1,5 +1,5 @@
 /**
- * Drizzle ORM schema for Meavo Stock.
+ * Drizzle ORM schema for Meavo MRP.
  *
  * Conventions:
  *  - All tables use snake_case in SQL, camelCase in TypeScript.
@@ -64,6 +64,34 @@ export const syncStatusEnum = pgEnum("sync_status", [
   "running",
   "succeeded",
   "failed",
+]);
+
+export const stockMovementTypeEnum = pgEnum("stock_movement_type", [
+  "initial",
+  "manual_receipt",
+  "zeron_receipt",
+  "production_out",
+  "element_consumption",
+  "batch_complete_flush",
+  "inventory_count",
+  "bom_rework_adjustment",
+]);
+
+export const manufacturingBatchStatusEnum = pgEnum("manufacturing_batch_status", [
+  "planned",
+  "in_production",
+  "completed",
+  "cancelled",
+]);
+
+export const recipeExceptionStatusEnum = pgEnum("recipe_exception_status", [
+  "active",
+  "reverted",
+]);
+
+export const recipeExceptionChangeTypeEnum = pgEnum("recipe_exception_change_type", [
+  "remove",
+  "add",
 ]);
 
 // ----------------------------- Tables ----------------------------
@@ -322,6 +350,537 @@ export const syncAttempts = pgTable(
   }),
 );
 
+/** Physical warehouse / site (Аксаково, Варна, Казанлък, …). */
+export const warehouses = pgTable(
+  "warehouses",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`)
+      .notNull(),
+    code: text("code").notNull(),
+    name: text("name").notNull(),
+    isActive: boolean("is_active").default(true).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+  },
+  (t) => ({
+    codeUq: uniqueIndex("warehouses_code_uq").on(t.code),
+  }),
+);
+
+/** Booth product line synced from Google Sheets (Soho, Camden 4, …). */
+export const boothModels = pgTable(
+  "booth_models",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`)
+      .notNull(),
+    name: text("name").notNull(),
+    isActive: boolean("is_active").default(true).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+  },
+  (t) => ({
+    nameUq: uniqueIndex("booth_models_name_uq").on(t.name),
+  }),
+);
+
+/** Checklist column on batch Опаковане tab (Таван, Под, …) per model. */
+export const boothElements = pgTable(
+  "booth_elements",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`)
+      .notNull(),
+    boothModelId: uuid("booth_model_id")
+      .references(() => boothModels.id, { onDelete: "cascade" })
+      .notNull(),
+    sheetHeader: text("sheet_header").notNull(),
+    /** Short label used in ElementBOM CSV (may differ from sheet_header). */
+    simpleName: text("simple_name").notNull(),
+    sortOrder: integer("sort_order").default(0).notNull(),
+    isActive: boolean("is_active").default(true).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+  },
+  (t) => ({
+    modelHeaderUq: uniqueIndex("booth_elements_model_header_uq").on(
+      t.boothModelId,
+      t.sheetHeader,
+    ),
+    modelSimpleNameUq: uniqueIndex("booth_elements_model_simple_name_uq").on(
+      t.boothModelId,
+      t.simpleName,
+    ),
+  }),
+);
+
+/** Raw materials tracked for stock (Zeron item code optional until API sync). */
+export const materials = pgTable(
+  "materials",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`)
+      .notNull(),
+    /** Zeron / internal SKU — unique when set. */
+    code: text("code"),
+    name: text("name").notNull(),
+    unit: text("unit").notNull().default("kg"),
+    unitPriceEur: numeric("unit_price_eur", { precision: 18, scale: 4 }),
+    /** Denormalized default-warehouse on-hand; see stock_balances per site. */
+    currentQuantity: numeric("current_quantity", { precision: 18, scale: 4 })
+      .default("0")
+      .notNull(),
+    isActive: boolean("is_active").default(true).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+  },
+  (t) => ({
+    codeUq: uniqueIndex("materials_code_uq").on(t.code),
+    nameIdx: index("materials_name_idx").on(t.name),
+    activeIdx: index("materials_active_idx").on(t.isActive),
+  }),
+);
+
+/** Material code referenced in ElementBOM but not yet in materials master. */
+export const bomMissingMaterialCodes = pgTable(
+  "bom_missing_material_codes",
+  {
+    code: text("code").primaryKey().notNull(),
+    bomLineCount: integer("bom_line_count").notNull().default(1),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+  },
+);
+
+/** Materials consumed to complete one element on one booth. */
+export const elementBomLines = pgTable(
+  "element_bom_lines",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`)
+      .notNull(),
+    boothElementId: uuid("booth_element_id")
+      .references(() => boothElements.id, { onDelete: "cascade" })
+      .notNull(),
+    materialId: uuid("material_id")
+      .references(() => materials.id, { onDelete: "restrict" })
+      .notNull(),
+    /** Empty/null = all exterior colours (wildcard). */
+    colour: text("colour"),
+    /** null = all markets; default = non-US; US = US booths only. */
+    market: text("market"),
+    quantity: numeric("quantity", { precision: 18, scale: 4 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+  },
+  (t) => ({
+    elementVariantMaterialUq: uniqueIndex(
+      "element_bom_lines_element_variant_material_uq",
+    ).on(t.boothElementId, t.colour, t.market, t.materialId),
+  }),
+);
+
+/** Row from master sheet Статус на партиди (synced from Google Sheets). */
+export const manufacturingBatches = pgTable(
+  "manufacturing_batches",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`)
+      .notNull(),
+    name: text("name").notNull(),
+    status: manufacturingBatchStatusEnum("status").default("planned").notNull(),
+    boothModelId: uuid("booth_model_id").references(() => boothModels.id, {
+      onDelete: "set null",
+    }),
+    qty: integer("qty"),
+    warehouseId: uuid("warehouse_id").references(() => warehouses.id, {
+      onDelete: "set null",
+    }),
+    masterSheetRowKey: text("master_sheet_row_key").notNull(),
+    batchSpreadsheetId: text("batch_spreadsheet_id"),
+    lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+  },
+  (t) => ({
+    rowKeyUq: uniqueIndex("manufacturing_batches_row_key_uq").on(
+      t.masterSheetRowKey,
+    ),
+    statusIdx: index("manufacturing_batches_status_idx").on(t.status),
+  }),
+);
+
+/** One booth row on batch Опаковане tab. */
+export const batchUnits = pgTable(
+  "batch_units",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`)
+      .notNull(),
+    manufacturingBatchId: uuid("manufacturing_batch_id")
+      .references(() => manufacturingBatches.id, { onDelete: "cascade" })
+      .notNull(),
+    sheetRowIndex: integer("sheet_row_index").notNull(),
+    boothIdText: text("booth_id_text"),
+    colour: text("colour"),
+    progressPct: numeric("progress_pct", { precision: 6, scale: 2 }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+  },
+  (t) => ({
+    batchRowUq: uniqueIndex("batch_units_batch_row_uq").on(
+      t.manufacturingBatchId,
+      t.sheetRowIndex,
+    ),
+  }),
+);
+
+/** Checkbox state per element on a batch unit row. */
+export const batchUnitElements = pgTable(
+  "batch_unit_elements",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`)
+      .notNull(),
+    batchUnitId: uuid("batch_unit_id")
+      .references(() => batchUnits.id, { onDelete: "cascade" })
+      .notNull(),
+    boothElementId: uuid("booth_element_id")
+      .references(() => boothElements.id, { onDelete: "restrict" })
+      .notNull(),
+    isComplete: boolean("is_complete").default(false).notNull(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    deductionPosted: boolean("deduction_posted").default(false).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+  },
+  (t) => ({
+    unitElementUq: uniqueIndex("batch_unit_elements_unit_element_uq").on(
+      t.batchUnitId,
+      t.boothElementId,
+    ),
+  }),
+);
+
+/** Named temporary override to standard recipes (e.g. material substitution). */
+export const recipeExceptions = pgTable(
+  "recipe_exceptions",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`)
+      .notNull(),
+    name: text("name").notNull(),
+    notes: text("notes"),
+    status: recipeExceptionStatusEnum("status").default("active").notNull(),
+    createdBy: uuid("created_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+    revertedAt: timestamp("reverted_at", { withTimezone: true }),
+  },
+  (t) => ({
+    statusIdx: index("recipe_exceptions_status_idx").on(t.status),
+  }),
+);
+
+/** Models / colour / market where an exception applies (null = wildcard). */
+export const recipeExceptionScopes = pgTable(
+  "recipe_exception_scopes",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`)
+      .notNull(),
+    exceptionId: uuid("exception_id")
+      .references(() => recipeExceptions.id, { onDelete: "cascade" })
+      .notNull(),
+    boothModelId: uuid("booth_model_id")
+      .references(() => boothModels.id, { onDelete: "cascade" })
+      .notNull(),
+    colour: text("colour"),
+    market: text("market"),
+  },
+  (t) => ({
+    exceptionIdx: index("recipe_exception_scopes_exception_idx").on(t.exceptionId),
+    scopeUq: uniqueIndex("recipe_exception_scopes_uq").on(
+      t.exceptionId,
+      t.boothModelId,
+      t.colour,
+      t.market,
+    ),
+  }),
+);
+
+/** BOM line removals or additions for an exception. */
+export const recipeExceptionLineChanges = pgTable(
+  "recipe_exception_line_changes",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`)
+      .notNull(),
+    exceptionId: uuid("exception_id")
+      .references(() => recipeExceptions.id, { onDelete: "cascade" })
+      .notNull(),
+    boothElementId: uuid("booth_element_id")
+      .references(() => boothElements.id, { onDelete: "cascade" })
+      .notNull(),
+    changeType: recipeExceptionChangeTypeEnum("change_type").notNull(),
+    materialId: uuid("material_id")
+      .references(() => materials.id, { onDelete: "restrict" })
+      .notNull(),
+    quantity: numeric("quantity", { precision: 18, scale: 4 }).notNull(),
+    colour: text("colour"),
+    market: text("market"),
+  },
+  (t) => ({
+    exceptionIdx: index("recipe_exception_line_changes_exception_idx").on(
+      t.exceptionId,
+    ),
+  }),
+);
+
+/** Link exception to production batch (whole batch or specific booths). */
+export const recipeExceptionBatchLinks = pgTable(
+  "recipe_exception_batch_links",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`)
+      .notNull(),
+    exceptionId: uuid("exception_id")
+      .references(() => recipeExceptions.id, { onDelete: "cascade" })
+      .notNull(),
+    batchLabel: text("batch_label").notNull(),
+    manufacturingBatchId: uuid("manufacturing_batch_id").references(
+      () => manufacturingBatches.id,
+      { onDelete: "set null" },
+    ),
+    applyToWholeBatch: boolean("apply_to_whole_batch").default(true).notNull(),
+    boothIdTexts: jsonb("booth_id_texts").default(sql`'[]'::jsonb`).notNull(),
+  },
+  (t) => ({
+    exceptionIdx: index("recipe_exception_batch_links_exception_idx").on(
+      t.exceptionId,
+    ),
+  }),
+);
+
+/** Cron / manual Google Sheets sync audit. */
+export const sheetSyncLog = pgTable("sheet_sync_log", {
+  id: uuid("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`)
+    .notNull(),
+  startedAt: timestamp("started_at", { withTimezone: true })
+    .default(sql`now()`)
+    .notNull(),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  tabsRead: integer("tabs_read"),
+  rowsUpserted: integer("rows_upserted"),
+  errors: jsonb("errors").default(sql`'[]'::jsonb`).notNull(),
+});
+
+/** Immutable ledger of quantity changes. */
+export const stockMovements = pgTable(
+  "stock_movements",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`)
+      .notNull(),
+    warehouseId: uuid("warehouse_id")
+      .references(() => warehouses.id, { onDelete: "restrict" })
+      .notNull(),
+    materialId: uuid("material_id")
+      .references(() => materials.id, { onDelete: "cascade" })
+      .notNull(),
+    movementType: stockMovementTypeEnum("movement_type").notNull(),
+    /** Signed delta applied to current_quantity (positive = in, negative = out). */
+    quantityDelta: numeric("quantity_delta", { precision: 18, scale: 4 }).notNull(),
+    effectiveAt: timestamp("effective_at", { withTimezone: true }).notNull(),
+    notes: text("notes"),
+    /** production_batches.id, future zeron_events.id, etc. */
+    referenceId: uuid("reference_id"),
+    metadata: jsonb("metadata").default(sql`'{}'::jsonb`).notNull(),
+    createdBy: uuid("created_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+  },
+  (t) => ({
+    warehouseIdx: index("stock_movements_warehouse_idx").on(t.warehouseId),
+    materialIdx: index("stock_movements_material_idx").on(t.materialId),
+    effectiveIdx: index("stock_movements_effective_idx").on(t.effectiveAt),
+    typeIdx: index("stock_movements_type_idx").on(t.movementType),
+  }),
+);
+
+/** On-hand quantity per warehouse × material (cache; ledger is source of truth). */
+export const stockBalances = pgTable(
+  "stock_balances",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`)
+      .notNull(),
+    warehouseId: uuid("warehouse_id")
+      .references(() => warehouses.id, { onDelete: "cascade" })
+      .notNull(),
+    materialId: uuid("material_id")
+      .references(() => materials.id, { onDelete: "cascade" })
+      .notNull(),
+    quantity: numeric("quantity", { precision: 18, scale: 4 })
+      .default("0")
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+  },
+  (t) => ({
+    whMaterialUq: uniqueIndex("stock_balances_wh_material_uq").on(
+      t.warehouseId,
+      t.materialId,
+    ),
+  }),
+);
+
+/** Planned production run — drives forecast, does not change stock until recorded. */
+export const productionBatches = pgTable(
+  "production_batches",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`)
+      .notNull(),
+    productionDate: timestamp("production_date", {
+      mode: "date",
+      withTimezone: false,
+    }).notNull(),
+    label: text("label"),
+    notes: text("notes"),
+    createdBy: uuid("created_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+  },
+  (t) => ({
+    dateIdx: index("production_batches_date_idx").on(t.productionDate),
+  }),
+);
+
+/** Material consumption per planned production batch. */
+export const productionBatchLines = pgTable(
+  "production_batch_lines",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`)
+      .notNull(),
+    batchId: uuid("batch_id")
+      .references(() => productionBatches.id, { onDelete: "cascade" })
+      .notNull(),
+    materialId: uuid("material_id")
+      .references(() => materials.id, { onDelete: "restrict" })
+      .notNull(),
+    quantity: numeric("quantity", { precision: 18, scale: 4 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+  },
+  (t) => ({
+    batchIdx: index("production_batch_lines_batch_idx").on(t.batchId),
+    materialIdx: index("production_batch_lines_material_idx").on(t.materialId),
+    batchMaterialUq: uniqueIndex("production_batch_lines_batch_material_uq").on(
+      t.batchId,
+      t.materialId,
+    ),
+  }),
+);
+
+/** Physical inventory count (инвентаризация) with variance audit. */
+export const inventoryCounts = pgTable(
+  "inventory_counts",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`)
+      .notNull(),
+    warehouseId: uuid("warehouse_id")
+      .references(() => warehouses.id, { onDelete: "restrict" })
+      .notNull(),
+    materialId: uuid("material_id")
+      .references(() => materials.id, { onDelete: "cascade" })
+      .notNull(),
+    countDate: timestamp("count_date", {
+      mode: "date",
+      withTimezone: false,
+    }).notNull(),
+    systemQuantity: numeric("system_quantity", { precision: 18, scale: 4 }).notNull(),
+    countedQuantity: numeric("counted_quantity", { precision: 18, scale: 4 }).notNull(),
+    /** counted − system at time of count */
+    variance: numeric("variance", { precision: 18, scale: 4 }).notNull(),
+    notes: text("notes"),
+    /** Production checkpoint: physical count reflects stock through this batch (inclusive). */
+    countedThroughBatchId: uuid("counted_through_batch_id").references(
+      () => manufacturingBatches.id,
+      { onDelete: "set null" },
+    ),
+    /** Batch name when not linked yet, or denormalized for display. */
+    countedThroughBatchLabel: text("counted_through_batch_label"),
+    movementId: uuid("movement_id").references(() => stockMovements.id, {
+      onDelete: "set null",
+    }),
+    createdBy: uuid("created_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
+  },
+  (t) => ({
+    materialIdx: index("inventory_counts_material_idx").on(t.materialId),
+    countDateIdx: index("inventory_counts_date_idx").on(t.countDate),
+  }),
+);
+
 // ----------------------------- Types -----------------------------
 
 export type User = typeof users.$inferSelect;
@@ -346,3 +905,35 @@ export type NewCorrectionLog = typeof correctionLogs.$inferInsert;
 
 export type SyncAttempt = typeof syncAttempts.$inferSelect;
 export type NewSyncAttempt = typeof syncAttempts.$inferInsert;
+
+export type Warehouse = typeof warehouses.$inferSelect;
+export type NewWarehouse = typeof warehouses.$inferInsert;
+
+export type BoothModel = typeof boothModels.$inferSelect;
+export type BoothElement = typeof boothElements.$inferSelect;
+export type ElementBomLine = typeof elementBomLines.$inferSelect;
+export type ManufacturingBatch = typeof manufacturingBatches.$inferSelect;
+export type BatchUnit = typeof batchUnits.$inferSelect;
+export type StockBalance = typeof stockBalances.$inferSelect;
+
+export type Material = typeof materials.$inferSelect;
+export type NewMaterial = typeof materials.$inferInsert;
+
+export type StockMovement = typeof stockMovements.$inferSelect;
+export type NewStockMovement = typeof stockMovements.$inferInsert;
+
+export type ProductionBatch = typeof productionBatches.$inferSelect;
+export type NewProductionBatch = typeof productionBatches.$inferInsert;
+
+export type ProductionBatchLine = typeof productionBatchLines.$inferSelect;
+export type NewProductionBatchLine = typeof productionBatchLines.$inferInsert;
+
+export type InventoryCount = typeof inventoryCounts.$inferSelect;
+export type NewInventoryCount = typeof inventoryCounts.$inferInsert;
+
+export type RecipeException = typeof recipeExceptions.$inferSelect;
+export type RecipeExceptionScope = typeof recipeExceptionScopes.$inferSelect;
+export type RecipeExceptionLineChange =
+  typeof recipeExceptionLineChanges.$inferSelect;
+export type RecipeExceptionBatchLink =
+  typeof recipeExceptionBatchLinks.$inferSelect;

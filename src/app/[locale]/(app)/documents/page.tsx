@@ -1,5 +1,5 @@
 import { setRequestLocale, getTranslations } from "next-intl/server";
-import { redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { eq, desc } from "drizzle-orm";
 import { FileText } from "lucide-react";
 
@@ -7,7 +7,8 @@ import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { db, schema } from "@/lib/db/client";
-import { getSessionUser } from "@/lib/auth/session";
+import { requireSessionUser } from "@/lib/auth/session";
+import { isInvoiceScannerEnabled } from "@/lib/features";
 import { StatusBadge } from "@/components/documents/status-badge";
 import { ZoneBadge } from "@/components/documents/zone-badge";
 import { formatDate, formatMoney } from "@/lib/utils/format";
@@ -21,13 +22,8 @@ export default async function DocumentsPage({
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
-
-  const user = await getSessionUser();
-  if (!user) {
-    redirect(
-      `/${locale}/login?next=${encodeURIComponent(`/${locale}/documents`)}`,
-    );
-  }
+  if (!isInvoiceScannerEnabled()) notFound();
+  const user = await requireSessionUser();
 
   const t = await getTranslations("documents");
   const tType = await getTranslations("scan.documentType");

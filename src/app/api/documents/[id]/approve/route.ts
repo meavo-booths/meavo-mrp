@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { getSessionUser } from "@/lib/auth/session";
+import { invoiceScannerDisabledResponse, requireApiUser } from "@/lib/api/guard";
 import {
   ExtractedDocumentSchema,
   type ExtractedDocument,
@@ -22,8 +22,10 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const user = await getSessionUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const disabled = invoiceScannerDisabledResponse();
+  if (disabled) return disabled;
+  const { user, error } = await requireApiUser();
+  if (error) return error;
   const { id } = await params;
 
   const body = (await request.json()) as { extraction?: unknown };

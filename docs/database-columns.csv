@@ -1,0 +1,259 @@
+object_type,table_or_enum,column_name,description
+enum,user_role,scanner,App permission: can scan/upload documents
+enum,user_role,reviewer,App permission: can review and approve extractions
+enum,user_role,admin,App permission: full administrative access
+enum,document_type,invoice,Scanned document type: supplier invoice
+enum,document_type,proforma,Scanned document type: proforma invoice
+enum,document_type,delivery_note,Scanned document type: delivery note
+enum,document_status,pending_review,Document awaiting human review
+enum,document_status,approved,Document approved after review
+enum,document_status,rejected,Document rejected during review
+enum,document_status,synced,Document successfully synced to Zeron
+enum,document_status,sync_failed,Document sync to Zeron failed
+enum,delivery_zone,local,Import zone: domestic/local supplier
+enum,delivery_zone,eu,Import zone: EU supplier
+enum,delivery_zone,non_eu,Import zone: non-EU supplier (customs)
+enum,sync_adapter,stub,Zeron sync via stub/no-op adapter
+enum,sync_adapter,export,Zeron sync via file export
+enum,sync_adapter,api,Zeron sync via API
+enum,sync_adapter,agent,Zeron sync via agent integration
+enum,sync_status,queued,Sync attempt queued
+enum,sync_status,running,Sync attempt in progress
+enum,sync_status,succeeded,Sync attempt completed successfully
+enum,sync_status,failed,Sync attempt failed
+enum,stock_movement_type,initial,Stock movement: opening/initial balance
+enum,stock_movement_type,manual_receipt,Stock movement: manual material receipt
+enum,stock_movement_type,zeron_receipt,Stock movement: receipt from Zeron ERP
+enum,stock_movement_type,production_out,Stock movement: production consumption (generic)
+enum,stock_movement_type,element_consumption,Stock movement: panel checkbox production deduction
+enum,stock_movement_type,batch_complete_flush,Stock movement: flush when batch completes
+enum,stock_movement_type,inventory_count,Stock movement: adjustment from physical inventory count
+enum,stock_movement_type,bom_rework_adjustment,Stock movement: BOM rework adjustment
+enum,manufacturing_batch_status,planned,Manufacturing batch not yet in production
+enum,manufacturing_batch_status,in_production,Manufacturing batch currently in production
+enum,manufacturing_batch_status,completed,Manufacturing batch finished
+enum,manufacturing_batch_status,cancelled,Manufacturing batch cancelled
+enum,recipe_exception_status,active,Recipe exception currently applied
+enum,recipe_exception_status,reverted,Recipe exception reverted to standard recipe
+enum,recipe_exception_change_type,remove,Exception removes a BOM material line
+enum,recipe_exception_change_type,add,Exception adds a BOM material line
+table,users,id,Primary key; matches Supabase Auth user ID
+table,users,email,User login email
+table,users,full_name,Display name
+table,users,avatar_url,Profile image URL
+table,users,role,App permission level (scanner / reviewer / admin)
+table,users,created_at,When the user row was created
+table,users,updated_at,When the user row was last updated
+table,suppliers,id,Primary key
+table,suppliers,name,Supplier display name
+table,suppliers,normalized_name,Lowercased and trimmed name for matching
+table,suppliers,vat_number,VAT registration number
+table,suppliers,eik,Bulgarian company identifier (EIK)
+table,suppliers,country_code,ISO country code (e.g. BG)
+table,suppliers,address,Supplier address
+table,suppliers,default_currency,Default currency ISO code (BGN EUR etc.)
+table,suppliers,delivery_zone,Import zone: local eu or non_eu
+table,suppliers,zeron_id,External ID in Zeron ERP
+table,suppliers,created_at,When the supplier was created
+table,suppliers,updated_at,When the supplier was last updated
+table,supplier_extraction_profiles,supplier_id,FK to suppliers.id (primary key)
+table,supplier_extraction_profiles,hints,JSON hints injected into AI extraction prompts
+table,supplier_extraction_profiles,recent_examples,JSON array of recent approved extractions for few-shot learning
+table,supplier_extraction_profiles,updated_at,When the extraction profile was last updated
+table,documents,id,Primary key
+table,documents,type,Document type: invoice proforma or delivery_note
+table,documents,document_number,Invoice or document number
+table,documents,issue_date,Document issue date
+table,documents,due_date,Payment due date
+table,documents,delivery_date,Delivery date
+table,documents,supplier_id,FK to matched suppliers.id
+table,documents,supplier_name_raw,Supplier name as read from the document
+table,documents,currency,Document currency
+table,documents,subtotal,Subtotal amount
+table,documents,vat_total,Total VAT amount
+table,documents,total,Grand total
+table,documents,delivery_zone,Import zone for customs logic
+table,documents,customs_ref,Customs reference (MRN / MDD / MAD)
+table,documents,status,Review and sync workflow status
+table,documents,original_file_path,Path in Supabase Storage originals bucket
+table,documents,thumbnail_path,Path to thumbnail image
+table,documents,original_mime_type,Uploaded file MIME type
+table,documents,original_size_bytes,Uploaded file size in bytes
+table,documents,content_hash,SHA-256 hash for deduplicating re-uploads
+table,documents,raw_ai_extraction,Raw JSON returned by AI extractor
+table,documents,confidence,JSON map of field paths to confidence scores
+table,documents,final_extraction,Reviewed and final extraction JSON
+table,documents,extractor_provider,AI model used (e.g. gemini-2.5-flash)
+table,documents,zeron_id,ID after sync to Zeron
+table,documents,synced_at,When synced to Zeron
+table,documents,created_by,FK to users.id who uploaded
+table,documents,approved_by,FK to users.id who approved
+table,documents,approved_at,When the document was approved
+table,documents,created_at,When the document was created
+table,documents,updated_at,When the document was last updated
+table,line_items,id,Primary key
+table,line_items,document_id,FK to documents.id
+table,line_items,position,1-based line number on the document
+table,line_items,sku,Item or SKU code
+table,line_items,name,Line item description
+table,line_items,quantity,Quantity
+table,line_items,unit,Unit of measure
+table,line_items,unit_price,Price per unit
+table,line_items,vat_rate,VAT rate (e.g. 20.000)
+table,line_items,line_total,Line total amount
+table,line_items,matched_zeron_item_id,Matched Zeron item ID
+table,line_items,notes,Free-text notes
+table,line_items,created_at,When the line was created
+table,correction_logs,id,Primary key
+table,correction_logs,document_id,FK to documents.id
+table,correction_logs,supplier_id,FK to suppliers.id for learning
+table,correction_logs,field_path,Dot-path of edited field (e.g. lineItems[2].unitPrice)
+table,correction_logs,ai_value,Original AI-extracted value
+table,correction_logs,user_value,User-corrected value
+table,correction_logs,note,Optional reason for the correction
+table,correction_logs,corrected_by,FK to users.id
+table,correction_logs,corrected_at,When the correction was made
+table,sync_attempts,id,Primary key
+table,sync_attempts,document_id,FK to documents.id
+table,sync_attempts,adapter,Zeron sync method used (stub export api agent)
+table,sync_attempts,status,Attempt status (queued running succeeded failed)
+table,sync_attempts,payload,JSON payload sent to the adapter
+table,sync_attempts,response,JSON response or output from the adapter
+table,sync_attempts,error,Error message if failed
+table,sync_attempts,attempted_at,When the sync attempt started
+table,sync_attempts,completed_at,When the sync attempt finished
+table,sync_attempts,is_current,Whether this is the latest attempt for the document
+table,warehouses,id,Primary key
+table,warehouses,code,Internal warehouse code (aksakovo varna kazanlak top)
+table,warehouses,name,Display name (Aksakovo Varna Kazanlak Topoli)
+table,warehouses,is_active,Whether the warehouse is in use
+table,warehouses,created_at,When the warehouse was created
+table,booth_models,id,Primary key
+table,booth_models,name,Booth model name (Soho Camden 4 etc.)
+table,booth_models,is_active,Whether the model is active
+table,booth_models,created_at,When the model was created
+table,booth_elements,id,Primary key
+table,booth_elements,booth_model_id,FK to booth_models.id
+table,booth_elements,sheet_header,Exact label from Google Sheet Opakovane tab (may contain newlines)
+table,booth_elements,simple_name,Short panel name used in Recipes CSV and BOM
+table,booth_elements,sort_order,Display and processing order
+table,booth_elements,is_active,Whether the panel is active
+table,booth_elements,created_at,When the panel was created
+table,materials,id,Primary key
+table,materials,code,Material SKU (e.g. 0138); unique when set
+table,materials,name,Material description
+table,materials,unit,Unit of measure (br kg etc.)
+table,materials,unit_price_eur,Unit price in EUR for BOM costing
+table,materials,current_quantity,Denormalized on-hand at default warehouse (Aksakovo)
+table,materials,is_active,Whether the material is active
+table,materials,created_at,When the material was created
+table,materials,updated_at,When the material was last updated
+table,bom_missing_material_codes,code,Material code in BOM but missing from materials (primary key)
+table,bom_missing_material_codes,bom_line_count,How many BOM lines reference this code
+table,bom_missing_material_codes,updated_at,When this missing-code record was last refreshed
+table,element_bom_lines,id,Primary key
+table,element_bom_lines,booth_element_id,FK to booth_elements.id (which panel)
+table,element_bom_lines,material_id,FK to materials.id
+table,element_bom_lines,colour,Applies to this colour only; null = all colours
+table,element_bom_lines,market,default = non-US US = US only; null = all markets
+table,element_bom_lines,quantity,Quantity consumed per booth for this panel
+table,element_bom_lines,created_at,When the BOM line was created
+table,manufacturing_batches,id,Primary key
+table,manufacturing_batches,name,Batch name from master sheet
+table,manufacturing_batches,status,planned in_production completed or cancelled
+table,manufacturing_batches,booth_model_id,FK to primary booth model for this batch
+table,manufacturing_batches,qty,Number of booths in the batch
+table,manufacturing_batches,warehouse_id,FK to warehouse materials are deducted from
+table,manufacturing_batches,master_sheet_row_key,Stable key from master Google Sheet row
+table,manufacturing_batches,batch_spreadsheet_id,Google Sheet ID for this batch Opakovane file
+table,manufacturing_batches,last_synced_at,When last synced from Google Sheets
+table,manufacturing_batches,created_at,When the batch row was created
+table,manufacturing_batches,updated_at,When the batch row was last updated
+table,batch_units,id,Primary key
+table,batch_units,manufacturing_batch_id,FK to manufacturing_batches.id
+table,batch_units,sheet_row_index,Row index on the batch Opakovane sheet
+table,batch_units,booth_id_text,Booth identifier text from the sheet
+table,batch_units,colour,Booth exterior colour
+table,batch_units,progress_pct,Packaging progress percentage
+table,batch_units,created_at,When the unit row was created
+table,batch_units,updated_at,When the unit row was last updated
+table,batch_unit_elements,id,Primary key
+table,batch_unit_elements,batch_unit_id,FK to batch_units.id
+table,batch_unit_elements,booth_element_id,FK to booth_elements.id (panel checkbox)
+table,batch_unit_elements,is_complete,Whether the panel checkbox is ticked
+table,batch_unit_elements,completed_at,When the panel was marked complete
+table,batch_unit_elements,deduction_posted,Whether stock consumption was posted for this checkbox
+table,batch_unit_elements,created_at,When the checkbox state was created
+table,batch_unit_elements,updated_at,When the checkbox state was last updated
+table,recipe_exceptions,id,Primary key
+table,recipe_exceptions,name,Human-readable exception name
+table,recipe_exceptions,notes,Reason or notes for the exception
+table,recipe_exceptions,status,active or reverted
+table,recipe_exceptions,created_by,FK to users.id who created it
+table,recipe_exceptions,created_at,When the exception was created
+table,recipe_exceptions,reverted_at,When the exception was reverted to standard recipe
+table,recipe_exception_scopes,id,Primary key
+table,recipe_exception_scopes,exception_id,FK to recipe_exceptions.id
+table,recipe_exception_scopes,booth_model_id,FK to booth_models.id this exception applies to
+table,recipe_exception_scopes,colour,Scope colour; null = all colours
+table,recipe_exception_scopes,market,Scope market; null = all markets
+table,recipe_exception_line_changes,id,Primary key
+table,recipe_exception_line_changes,exception_id,FK to recipe_exceptions.id
+table,recipe_exception_line_changes,booth_element_id,FK to booth_elements.id (panel)
+table,recipe_exception_line_changes,change_type,remove or add
+table,recipe_exception_line_changes,material_id,FK to materials.id
+table,recipe_exception_line_changes,quantity,Quantity to remove or add
+table,recipe_exception_line_changes,colour,Line-specific colour; null = wildcard
+table,recipe_exception_line_changes,market,Line-specific market; null = wildcard
+table,recipe_exception_batch_links,id,Primary key
+table,recipe_exception_batch_links,exception_id,FK to recipe_exceptions.id
+table,recipe_exception_batch_links,batch_label,Batch name stored for display
+table,recipe_exception_batch_links,manufacturing_batch_id,FK to manufacturing_batches.id when synced
+table,recipe_exception_batch_links,apply_to_whole_batch,true = entire batch; false = specific booths only
+table,recipe_exception_batch_links,booth_id_texts,JSON array of booth IDs when not whole batch
+table,sheet_sync_log,id,Primary key
+table,sheet_sync_log,started_at,When a Google Sheets sync run started
+table,sheet_sync_log,completed_at,When the sync run finished
+table,sheet_sync_log,tabs_read,Number of sheet tabs read
+table,sheet_sync_log,rows_upserted,Number of rows written or updated
+table,sheet_sync_log,errors,JSON array of errors from the sync run
+table,stock_movements,id,Primary key
+table,stock_movements,warehouse_id,FK to warehouses.id
+table,stock_movements,material_id,FK to materials.id
+table,stock_movements,movement_type,Kind of stock change (receipt consumption count etc.)
+table,stock_movements,quantity_delta,Signed quantity change (positive in negative out)
+table,stock_movements,effective_at,Business date and time the movement applies to
+table,stock_movements,notes,Free-text notes
+table,stock_movements,reference_id,Optional FK to related entity (batch etc.)
+table,stock_movements,metadata,JSON audit extras (e.g. count details)
+table,stock_movements,created_by,FK to users.id who recorded it
+table,stock_movements,created_at,When the movement was logged
+table,stock_balances,id,Primary key
+table,stock_balances,warehouse_id,FK to warehouses.id
+table,stock_balances,material_id,FK to materials.id
+table,stock_balances,quantity,Current on-hand quantity (cache of ledger)
+table,stock_balances,updated_at,When the balance was last updated
+table,production_batches,id,Primary key
+table,production_batches,production_date,Planned production date
+table,production_batches,label,Optional label
+table,production_batches,notes,Notes
+table,production_batches,created_by,FK to users.id
+table,production_batches,created_at,When the plan was created
+table,production_batch_lines,id,Primary key
+table,production_batch_lines,batch_id,FK to production_batches.id
+table,production_batch_lines,material_id,FK to materials.id
+table,production_batch_lines,quantity,Planned material quantity
+table,production_batch_lines,created_at,When the line was created
+table,inventory_counts,id,Primary key
+table,inventory_counts,warehouse_id,FK to warehouses.id
+table,inventory_counts,material_id,FK to materials.id
+table,inventory_counts,count_date,Date of the physical count
+table,inventory_counts,system_quantity,On-hand quantity before the count
+table,inventory_counts,counted_quantity,Physically counted quantity
+table,inventory_counts,variance,Counted minus system at time of count
+table,inventory_counts,notes,Free-text notes
+table,inventory_counts,counted_through_batch_id,FK to batch stock count includes through (inclusive)
+table,inventory_counts,counted_through_batch_label,Batch name for display or before sync
+table,inventory_counts,movement_id,FK to stock_movements.id for the adjustment
+table,inventory_counts,created_by,FK to users.id who performed the count
+table,inventory_counts,created_at,When the count was recorded

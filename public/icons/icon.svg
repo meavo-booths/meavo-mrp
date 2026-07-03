@@ -1,15 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Meavo Stock">
-  <rect width="512" height="512" rx="96" fill="#0f172a"/>
-  <g transform="translate(96 96)" fill="none" stroke="#ffffff" stroke-width="20" stroke-linecap="round" stroke-linejoin="round">
-    <!-- document -->
-    <path d="M40 24 h180 l60 60 v220 a16 16 0 0 1 -16 16 H40 a16 16 0 0 1 -16 -16 V40 a16 16 0 0 1 16 -16 z" fill="#ffffff" stroke="none"/>
-    <path d="M220 24 v60 h60" stroke="#0f172a" fill="none"/>
-    <!-- text lines -->
-    <line x1="60" y1="120" x2="240" y2="120" stroke="#0f172a"/>
-    <line x1="60" y1="160" x2="220" y2="160" stroke="#0f172a"/>
-    <line x1="60" y1="200" x2="200" y2="200" stroke="#0f172a"/>
-    <!-- check -->
-    <circle cx="244" cy="260" r="44" fill="#16a34a" stroke="none"/>
-    <path d="M222 262 l16 14 l28 -32" stroke="#ffffff"/>
-  </g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Meavo MRP">
+  <rect width="512" height="512" rx="112" fill="#0C8F61"/>
+  <text x="256" y="290" text-anchor="middle" fill="#FAF9F7" font-family="system-ui, sans-serif" font-size="120" font-weight="600">M</text>
 </svg>

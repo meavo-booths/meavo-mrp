@@ -2,31 +2,32 @@ import type { Metadata, Viewport } from "next";
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages, setRequestLocale } from "next-intl/server";
 import { notFound } from "next/navigation";
-import { Inter } from "next/font/google";
+import { Instrument_Sans } from "next/font/google";
 
 import { routing, type Locale } from "@/i18n/routing";
 import { Toaster } from "@/components/ui/toaster";
 import "../globals.css";
 
-const inter = Inter({
-  subsets: ["latin", "cyrillic", "cyrillic-ext"],
+const instrumentSans = Instrument_Sans({
+  subsets: ["latin", "latin-ext"],
   variable: "--font-sans",
   display: "swap",
+  weight: ["400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
   title: {
-    default: "Meavo Stock",
-    template: "%s · Meavo Stock",
+    default: "Meavo MRP",
+    template: "%s · Meavo MRP",
   },
   description:
     "AI-powered scanning of invoices, proforma invoices, and delivery notes with sync to Zeron ERP.",
-  applicationName: "Meavo Stock",
+  applicationName: "Meavo MRP",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Meavo Stock",
+    title: "Meavo MRP",
   },
   icons: {
     icon: [
@@ -39,8 +40,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
+    { media: "(prefers-color-scheme: light)", color: "#FAF9F7" },
+    { media: "(prefers-color-scheme: dark)", color: "#212121" },
   ],
   width: "device-width",
   initialScale: 1,
@@ -67,7 +68,7 @@ export default async function LocaleLayout({
   const messages = await getMessages();
 
   return (
-    <html lang={locale} className={`${inter.variable} h-full antialiased`}>
+    <html lang={locale} className={`${instrumentSans.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
         <NextIntlClientProvider messages={messages} locale={locale}>
           {children}

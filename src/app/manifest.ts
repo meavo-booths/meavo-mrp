@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Meavo Stock",
-    short_name: "Meavo Stock",
+    name: "Meavo MRP",
+    short_name: "Meavo MRP",
     description:
       "Сканиране на фактури, проформи и стокови разписки с AI и синхронизация със Zeron.",
     start_url: "/bg",

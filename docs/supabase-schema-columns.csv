@@ -1,0 +1,221 @@
+column_name,type,description,possible_values
+batch_unit_elements.id,uuid,Primary key,UUID v4
+batch_unit_elements.batch_unit_id,uuid,FK to batch_units.id,FK → batch_units.id
+batch_unit_elements.booth_element_id,uuid,FK to booth_elements.id,FK → booth_elements.id
+batch_unit_elements.is_complete,boolean,Panel checkbox ticked,true | false
+batch_unit_elements.completed_at,timestamptz,When panel marked complete,nullable
+batch_unit_elements.deduction_posted,boolean,Stock deduction posted for checkbox,true | false
+batch_unit_elements.created_at,timestamptz,When created,
+batch_unit_elements.updated_at,timestamptz,When last updated,
+batch_units.id,uuid,Primary key,UUID v4
+batch_units.manufacturing_batch_id,uuid,FK to manufacturing_batches.id,FK → manufacturing_batches.id
+batch_units.sheet_row_index,integer,Row index on Opakovane sheet,
+batch_units.booth_id_text,text,Booth ID from sheet,nullable
+batch_units.colour,text,Booth exterior colour,null (all colours) | any colour name; nullable
+batch_units.progress_pct,"numeric(6,2)",Packaging progress percentage,nullable
+batch_units.created_at,timestamptz,When created,
+batch_units.updated_at,timestamptz,When last updated,
+bom_missing_material_codes.code,text,BOM code missing from materials (PK),
+bom_missing_material_codes.bom_line_count,integer,BOM lines referencing this code,
+bom_missing_material_codes.updated_at,timestamptz,When last refreshed,
+booth_elements.id,uuid,Primary key,UUID v4
+booth_elements.booth_model_id,uuid,FK to booth_models.id,FK → booth_models.id
+booth_elements.sheet_header,text,Label from Google Sheet Opakovane tab,
+booth_elements.simple_name,text,Short panel name for BOM CSV,
+booth_elements.sort_order,integer,Display order,
+booth_elements.is_active,boolean,Whether panel is active,true | false
+booth_elements.created_at,timestamptz,When created,
+booth_models.id,uuid,Primary key,UUID v4
+booth_models.name,text,Booth model name,
+booth_models.is_active,boolean,Whether model is active,true | false
+booth_models.created_at,timestamptz,When created,
+correction_logs.id,uuid,Primary key,UUID v4
+correction_logs.document_id,uuid,FK to documents.id,FK → documents.id
+correction_logs.supplier_id,uuid,FK to suppliers.id,FK → suppliers.id; nullable
+correction_logs.field_path,text,Dot-path of edited field,
+correction_logs.ai_value,jsonb,Original AI value,JSON object or array; nullable
+correction_logs.user_value,jsonb,User-corrected value,JSON object or array; nullable
+correction_logs.note,text,Reason for correction,nullable
+correction_logs.corrected_by,uuid,FK to users.id,FK → users.id; nullable
+correction_logs.corrected_at,timestamptz,When corrected,
+documents.id,uuid,Primary key,UUID v4
+documents.type,document_type,Document type,invoice | proforma | delivery_note
+documents.document_number,text,Invoice or document number,nullable
+documents.issue_date,timestamp,Document issue date,nullable
+documents.due_date,timestamp,Payment due date,nullable
+documents.delivery_date,timestamp,Delivery date,nullable
+documents.supplier_id,uuid,FK to suppliers.id,FK → suppliers.id; nullable
+documents.supplier_name_raw,text,Supplier name from document OCR,nullable
+documents.currency,text,Document currency code,nullable
+documents.subtotal,"numeric(18,4)",Subtotal amount,nullable
+documents.vat_total,"numeric(18,4)",Total VAT amount,nullable
+documents.total,"numeric(18,4)",Grand total,nullable
+documents.delivery_zone,delivery_zone,Import zone,local | eu | non_eu
+documents.customs_ref,text,Customs reference (MRN),nullable
+documents.status,document_status,Review and sync workflow status,pending_review | approved | rejected | synced | sync_failed
+documents.original_file_path,text,Path in Supabase Storage originals bucket,
+documents.thumbnail_path,text,Path to thumbnail image,nullable
+documents.original_mime_type,text,Uploaded file MIME type,nullable
+documents.original_size_bytes,bigint,Uploaded file size in bytes,nullable
+documents.content_hash,text,SHA-256 hash for deduplication,nullable
+documents.raw_ai_extraction,jsonb,Raw JSON from AI extractor,JSON object or array; nullable
+documents.confidence,jsonb,JSON field confidence scores,JSON object or array
+documents.final_extraction,jsonb,Final reviewed extraction JSON,JSON object or array; nullable
+documents.extractor_provider,text,AI model used for extraction,nullable
+documents.zeron_id,text,ID after Zeron sync,nullable
+documents.synced_at,timestamptz,When synced to Zeron,nullable
+documents.created_by,uuid,FK to users.id who uploaded,FK → users.id; nullable
+documents.approved_by,uuid,FK to users.id who approved,FK → users.id; nullable
+documents.approved_at,timestamptz,When approved,nullable
+documents.created_at,timestamptz,When created,
+documents.updated_at,timestamptz,When last updated,
+element_bom_lines.id,uuid,Primary key,UUID v4
+element_bom_lines.booth_element_id,uuid,FK to booth_elements.id,FK → booth_elements.id
+element_bom_lines.material_id,uuid,FK to materials.id,FK → materials.id
+element_bom_lines.colour,text,Colour filter; null = all colours,null (all colours) | any colour name; nullable
+element_bom_lines.market,text,Market filter; null = all markets,null (all) | default (non-US) | US; nullable
+element_bom_lines.quantity,"numeric(18,4)",Qty consumed per booth for panel,
+element_bom_lines.created_at,timestamptz,When created,
+inventory_counts.id,uuid,Primary key,UUID v4
+inventory_counts.warehouse_id,uuid,FK to warehouses.id,FK → warehouses.id
+inventory_counts.material_id,uuid,FK to materials.id,FK → materials.id
+inventory_counts.count_date,timestamp,Physical count date,
+inventory_counts.system_quantity,"numeric(18,4)",System qty before count,
+inventory_counts.counted_quantity,"numeric(18,4)",Physically counted qty,
+inventory_counts.variance,"numeric(18,4)",Counted minus system,
+inventory_counts.notes,text,Free-text notes,nullable
+inventory_counts.movement_id,uuid,FK to stock_movements.id,FK → stock_movements.id; nullable
+inventory_counts.created_by,uuid,FK to users.id,FK → users.id; nullable
+inventory_counts.created_at,timestamptz,When recorded,
+inventory_counts.counted_through_batch_id,uuid,FK to manufacturing_batches.id checkpoint,FK → manufacturing_batches.id; nullable
+inventory_counts.counted_through_batch_label,text,Batch name for display,nullable
+line_items.id,uuid,Primary key,UUID v4
+line_items.document_id,uuid,FK to documents.id,FK → documents.id
+line_items.position,integer,1-based line number on document,
+line_items.sku,text,Item or SKU code,nullable
+line_items.name,text,Line item description,
+line_items.quantity,"numeric(18,4)",Quantity,nullable
+line_items.unit,text,Unit of measure,nullable
+line_items.unit_price,"numeric(18,4)",Price per unit,nullable
+line_items.vat_rate,"numeric(6,3)",VAT rate percentage,nullable
+line_items.line_total,"numeric(18,4)",Line total amount,nullable
+line_items.matched_zeron_item_id,text,Matched Zeron item ID,nullable
+line_items.notes,text,Free-text notes,nullable
+line_items.created_at,timestamptz,When created,
+manufacturing_batches.id,uuid,Primary key,UUID v4
+manufacturing_batches.name,text,Batch name from master sheet,
+manufacturing_batches.status,manufacturing_batch_status,Batch production status,planned | in_production | completed | cancelled
+manufacturing_batches.booth_model_id,uuid,FK to booth_models.id,FK → booth_models.id; nullable
+manufacturing_batches.qty,integer,Number of booths in batch,nullable
+manufacturing_batches.warehouse_id,uuid,FK to warehouses.id for deductions,FK → warehouses.id; nullable
+manufacturing_batches.master_sheet_row_key,text,Stable key from master sheet row,
+manufacturing_batches.batch_spreadsheet_id,text,Google Sheet ID for batch file,nullable
+manufacturing_batches.last_synced_at,timestamptz,Last Google Sheets sync time,nullable
+manufacturing_batches.created_at,timestamptz,When created,
+manufacturing_batches.updated_at,timestamptz,When last updated,
+materials.id,uuid,Primary key,UUID v4
+materials.code,text,Material SKU code,nullable
+materials.name,text,Material description,
+materials.unit,text,Unit of measure,
+materials.unit_price_eur,"numeric(18,4)",Unit price in EUR,nullable
+materials.current_quantity,"numeric(18,4)",Denormalized on-hand at default warehouse,
+materials.is_active,boolean,Whether material is active,true | false
+materials.created_at,timestamptz,When created,
+materials.updated_at,timestamptz,When last updated,
+production_batch_lines.id,uuid,Primary key,UUID v4
+production_batch_lines.batch_id,uuid,FK to production_batches.id,FK → production_batches.id
+production_batch_lines.material_id,uuid,FK to materials.id,FK → materials.id
+production_batch_lines.quantity,"numeric(18,4)",Planned material quantity,
+production_batch_lines.created_at,timestamptz,When created,
+production_batches.id,uuid,Primary key,UUID v4
+production_batches.production_date,timestamp,Planned production date,
+production_batches.label,text,Optional label,nullable
+production_batches.notes,text,Notes,nullable
+production_batches.created_by,uuid,FK to users.id,FK → users.id; nullable
+production_batches.created_at,timestamptz,When created,
+recipe_exception_batch_links.id,uuid,Primary key,UUID v4
+recipe_exception_batch_links.exception_id,uuid,FK to recipe_exceptions.id,FK → recipe_exceptions.id
+recipe_exception_batch_links.batch_label,text,Batch name for display,
+recipe_exception_batch_links.manufacturing_batch_id,uuid,FK to manufacturing_batches.id,FK → manufacturing_batches.id; nullable
+recipe_exception_batch_links.apply_to_whole_batch,boolean,Whole batch vs specific booths,true | false
+recipe_exception_batch_links.booth_id_texts,jsonb,JSON array of booth IDs,JSON object or array
+recipe_exception_line_changes.id,uuid,Primary key,UUID v4
+recipe_exception_line_changes.exception_id,uuid,FK to recipe_exceptions.id,FK → recipe_exceptions.id
+recipe_exception_line_changes.booth_element_id,uuid,FK to booth_elements.id,FK → booth_elements.id
+recipe_exception_line_changes.change_type,recipe_exception_change_type,Remove or add BOM line,remove | add
+recipe_exception_line_changes.material_id,uuid,FK to materials.id,FK → materials.id
+recipe_exception_line_changes.quantity,"numeric(18,4)",Qty to remove or add,
+recipe_exception_line_changes.colour,text,Line colour; null = wildcard,null (all colours) | any colour name; nullable
+recipe_exception_line_changes.market,text,Line market; null = wildcard,null (all) | default (non-US) | US; nullable
+recipe_exception_scopes.id,uuid,Primary key,UUID v4
+recipe_exception_scopes.exception_id,uuid,FK to recipe_exceptions.id,FK → recipe_exceptions.id
+recipe_exception_scopes.booth_model_id,uuid,FK to booth_models.id,FK → booth_models.id
+recipe_exception_scopes.colour,text,Scope colour; null = all,null (all colours) | any colour name; nullable
+recipe_exception_scopes.market,text,Scope market; null = all,null (all) | default (non-US) | US; nullable
+recipe_exceptions.id,uuid,Primary key,UUID v4
+recipe_exceptions.name,text,Exception display name,
+recipe_exceptions.notes,text,Reason or notes,nullable
+recipe_exceptions.status,recipe_exception_status,Active or reverted,active | reverted
+recipe_exceptions.created_by,uuid,FK to users.id,FK → users.id; nullable
+recipe_exceptions.created_at,timestamptz,When created,
+recipe_exceptions.reverted_at,timestamptz,When reverted to standard recipe,nullable
+sheet_sync_log.id,uuid,Primary key,UUID v4
+sheet_sync_log.started_at,timestamptz,Sync run start time,
+sheet_sync_log.completed_at,timestamptz,Sync run end time,nullable
+sheet_sync_log.tabs_read,integer,Sheet tabs read,nullable
+sheet_sync_log.rows_upserted,integer,Rows written or updated,nullable
+sheet_sync_log.errors,jsonb,JSON array of sync errors,JSON object or array
+stock_balances.id,uuid,Primary key,UUID v4
+stock_balances.warehouse_id,uuid,FK to warehouses.id,FK → warehouses.id
+stock_balances.material_id,uuid,FK to materials.id,FK → materials.id
+stock_balances.quantity,"numeric(18,4)",Current on-hand quantity,
+stock_balances.updated_at,timestamptz,When balance last updated,
+stock_movements.id,uuid,Primary key,UUID v4
+stock_movements.warehouse_id,uuid,FK to warehouses.id,FK → warehouses.id
+stock_movements.material_id,uuid,FK to materials.id,FK → materials.id
+stock_movements.movement_type,stock_movement_type,Kind of stock change,initial | manual_receipt | zeron_receipt | production_out | element_consumption | batch_complete_flush | inventory_count | bom_rework_adjustment
+stock_movements.quantity_delta,"numeric(18,4)",Signed qty change (+ in / - out),
+stock_movements.effective_at,timestamptz,Business date of movement,
+stock_movements.notes,text,Free-text notes,nullable
+stock_movements.reference_id,uuid,Optional FK to related entity,nullable
+stock_movements.metadata,jsonb,JSON audit extras,JSON object or array
+stock_movements.created_by,uuid,FK to users.id,FK → users.id; nullable
+stock_movements.created_at,timestamptz,When logged,
+supplier_extraction_profiles.supplier_id,uuid,FK to suppliers.id (primary key),FK → suppliers.id
+supplier_extraction_profiles.hints,jsonb,JSON hints for AI extraction prompts,JSON object or array
+supplier_extraction_profiles.recent_examples,jsonb,JSON array of recent approved extractions,JSON object or array
+supplier_extraction_profiles.updated_at,timestamptz,When the profile was last updated,
+suppliers.id,uuid,Primary key,UUID v4
+suppliers.name,text,Supplier display name,
+suppliers.normalized_name,text,Lowercased trimmed name for matching,
+suppliers.vat_number,text,VAT registration number,nullable
+suppliers.eik,text,Bulgarian company identifier (EIK),nullable
+suppliers.country_code,text,ISO country code,nullable
+suppliers.address,text,Supplier address,nullable
+suppliers.default_currency,text,Default currency ISO code,nullable
+suppliers.delivery_zone,delivery_zone,Import zone for supplier,local | eu | non_eu
+suppliers.zeron_id,text,External ID in Zeron ERP,nullable
+suppliers.created_at,timestamptz,When the supplier was created,
+suppliers.updated_at,timestamptz,When the supplier was last updated,
+sync_attempts.id,uuid,Primary key,UUID v4
+sync_attempts.document_id,uuid,FK to documents.id,FK → documents.id
+sync_attempts.adapter,sync_adapter,Zeron sync adapter used,stub | export | api | agent
+sync_attempts.status,sync_status,Sync attempt status,queued | running | succeeded | failed
+sync_attempts.payload,jsonb,JSON payload sent,JSON object or array; nullable
+sync_attempts.response,jsonb,JSON response from adapter,JSON object or array; nullable
+sync_attempts.error,text,Error message if failed,nullable
+sync_attempts.attempted_at,timestamptz,When attempt started,
+sync_attempts.completed_at,timestamptz,When attempt finished,nullable
+sync_attempts.is_current,boolean,Latest attempt for document,true | false
+users.id,uuid,Primary key; matches Supabase Auth user ID,UUID v4
+users.email,text,User login email,
+users.full_name,text,Display name,nullable
+users.avatar_url,text,Profile image URL,nullable
+users.role,user_role,App permission level,scanner | reviewer | admin
+users.created_at,timestamptz,When the user row was created,
+users.updated_at,timestamptz,When the user row was last updated,
+warehouses.id,uuid,Primary key,UUID v4
+warehouses.code,text,Internal warehouse code,
+warehouses.name,text,Display name,
+warehouses.is_active,boolean,Whether warehouse is in use,true | false
+warehouses.created_at,timestamptz,When created,

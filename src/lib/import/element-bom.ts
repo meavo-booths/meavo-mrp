@@ -1,0 +1,189 @@
+import "server-only";
+
+import { and, eq, inArray } from "drizzle-orm";
+
+import { parseCsv, rowsToObjects, serializeCsv } from "@/lib/import/csv";
+import { ensureBoothModelId } from "@/lib/import/resolve";
+import {
+  ELEMENT_BOM_COLUMNS,
+  parseMarket,
+  parseOptionalColour,
+  parseQuantity,
+  type BomLineInput,
+} from "@/lib/import/schemas";
+import { emptyImportResult, type ImportResult } from "@/lib/import/types";
+import { db, schema } from "@/lib/db/client";
+import { listAllBomLinesForExport } from "@/lib/stock/bom-cost";
+import { syncBomMissingFromMaterialCodes } from "@/lib/stock/bom-missing";
+import { validateBomConflicts } from "@/lib/stock/bom-match";
+
+export function elementBomTemplateCsv(): string {
+  return serializeCsv([...ELEMENT_BOM_COLUMNS], [
+    ["Soho", "", "", "Таван", "0138", "1", ""],
+    ["Soho", "Pure White", "", "Таван", "0138", "1.2", ""],
+    ["Soho", "", "US", "Таван", "0138", "1.1", ""],
+  ]);
+}
+
+export async function exportElementBomCsv(): Promise<string> {
+  const rows = await listAllBomLinesForExport();
+
+  return serializeCsv(
+    [...ELEMENT_BOM_COLUMNS, "line_cost_eur"],
+    rows.map((r) => {
+      const lineCost =
+        r.unitPriceEur != null
+          ? (Number(r.quantity) * Number(r.unitPriceEur)).toFixed(4)
+          : "";
+      return [
+        r.boothModel,
+        r.colour ?? "",
+        r.market ?? "",
+        r.simpleName,
+        r.materialCode ?? "",
+        r.quantity,
+        "",
+        lineCost,
+      ];
+    }),
+  );
+}
+
+export async function importElementBomCsv(text: string): Promise<ImportResult> {
+  const result = emptyImportResult();
+  const { headers, rows } = parseCsv(text);
+  const objects = rowsToObjects(headers, rows);
+
+  const parsed: BomLineInput[] = [];
+
+  for (let i = 0; i < objects.length; i++) {
+    const rowNum = i + 2;
+    const raw = objects[i]!;
+    const boothModel = raw.booth_model?.trim();
+    const element = raw.element?.trim();
+    const materialCode = raw.material_code?.trim();
+
+    if (!boothModel && !element && !materialCode) continue;
+
+    if (!boothModel || !element || !materialCode) {
+      result.ok = false;
+      result.errors.push({
+        row: rowNum,
+        message: "booth_model, element, and material_code are required",
+      });
+      continue;
+    }
+
+    try {
+      parsed.push({
+        row: rowNum,
+        boothModel,
+        element,
+        materialCode,
+        colour: parseOptionalColour(raw.colour ?? ""),
+        market: parseMarket(raw.market ?? ""),
+        quantity: parseQuantity(raw.quantity ?? ""),
+      });
+    } catch (err) {
+      result.ok = false;
+      result.errors.push({
+        row: rowNum,
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  if (!result.ok) return result;
+
+  await syncBomMissingFromMaterialCodes(parsed.map((l) => l.materialCode));
+
+  const byModel = new Map<string, BomLineInput[]>();
+  for (const line of parsed) {
+    const bucket = byModel.get(line.boothModel) ?? [];
+    bucket.push(line);
+    byModel.set(line.boothModel, bucket);
+  }
+
+  for (const [boothModel, lines] of byModel) {
+    const conflicts = validateBomConflicts(lines);
+    if (conflicts.length > 0) {
+      result.ok = false;
+      for (const c of conflicts) {
+        result.errors.push({ row: c.row, message: c.message });
+      }
+      continue;
+    }
+
+    try {
+      await db.transaction(async (tx) => {
+        const boothModelId = await ensureBoothModelId(boothModel);
+
+        const elements = await tx
+          .select({
+            id: schema.boothElements.id,
+            simpleName: schema.boothElements.simpleName,
+          })
+          .from(schema.boothElements)
+          .where(eq(schema.boothElements.boothModelId, boothModelId));
+
+        const elementBySimple = new Map(
+          elements.map((e) => [e.simpleName, e.id]),
+        );
+        const elementIds = elements.map((e) => e.id);
+
+        if (elementIds.length > 0) {
+          await tx
+            .delete(schema.elementBomLines)
+            .where(inArray(schema.elementBomLines.boothElementId, elementIds));
+        }
+
+        const materials = await tx.select().from(schema.materials);
+        const materialByCode = new Map(
+          materials
+            .filter((m) => m.code)
+            .map((m) => [m.code!, m.id]),
+        );
+
+        let inserted = 0;
+        for (const line of lines) {
+          const materialId = materialByCode.get(line.materialCode);
+          if (!materialId) {
+            result.skipped++;
+            result.warnings.push({
+              row: line.row,
+              message: `Skipped unknown material_code "${line.materialCode}"`,
+            });
+            continue;
+          }
+
+          const boothElementId = elementBySimple.get(line.element);
+          if (!boothElementId) {
+            result.ok = false;
+            throw new Error(
+              `Row ${line.row}: unknown element "${line.element}" for model ${boothModel}`,
+            );
+          }
+
+          await tx.insert(schema.elementBomLines).values({
+            boothElementId,
+            materialId,
+            colour: line.colour,
+            market: line.market,
+            quantity: line.quantity,
+          });
+          inserted++;
+        }
+
+        result.created += inserted;
+      });
+    } catch (err) {
+      result.ok = false;
+      result.errors.push({
+        row: 0,
+        message: `${boothModel}: ${err instanceof Error ? err.message : String(err)}`,
+      });
+    }
+  }
+
+  return result;
+}

@@ -39,7 +39,7 @@ export function LoginForm({
   };
 
   return (
-    <div className="rounded-xl border bg-card p-6 shadow-sm">
+    <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
       {error ? (
         <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
           <p className="font-medium">{errorTitle}</p>

@@ -1,13 +1,13 @@
 # Supabase Setup (one-time)
 
 After creating your Supabase project (Frankfurt region, Free tier — see
-[`accounts-checklist.md`](./accounts-checklist.md)), run the SQL below in
+`[accounts-checklist.md](./accounts-checklist.md)`), run the SQL below in
 **SQL Editor** to:
 
 1. Sync `public.users` rows when new auth users sign in (so we have a row
-   with our `role` per user).
+  with our `role` per user).
 2. Create Storage buckets `originals` and `thumbnails` with the right
-   row-level-security policies.
+  row-level-security policies.
 
 > Run each section once. Re-running the trigger DDL is idempotent if you use
 > `OR REPLACE`.
@@ -79,12 +79,22 @@ create trigger on_auth_user_updated
 
 In the dashboard, **Storage → New bucket**:
 
-| Bucket name | Public | Notes |
-| --- | --- | --- |
-| `originals` | **Private** | Source images / PDFs |
-| `thumbnails` | **Private** | Compressed previews |
 
-Then, in **SQL Editor**, paste the following to enforce per-user access:
+| Bucket name  | Public      | Notes                |
+| ------------ | ----------- | -------------------- |
+| `originals`  | **Private** | Source images / PDFs |
+| `thumbnails` | **Private** | Compressed previews  |
+
+
+Then, in **SQL Editor**, paste the following to enforce per-user access.
+
+> **Note:** Our server routes (Route Handlers / RSC) currently use the
+> **service-role key** for storage operations because cookie-based auth in
+> Next.js Route Handlers can be unreliable across runtimes. Authorization is
+> enforced at the API layer (`getSessionUser` + `createdBy` ownership check).
+> The Storage RLS policies below are still applied as **defense-in-depth** —
+> they kick in if anything ever calls Supabase Storage directly from a browser
+> using the anon key.
 
 ```sql
 -- Each user can read/write only objects under a `<their-uid>/...` prefix.
@@ -179,3 +189,4 @@ pnpm db:push      # for development (idempotent against current schema)
 # or
 pnpm db:migrate   # for production deploys
 ```
+

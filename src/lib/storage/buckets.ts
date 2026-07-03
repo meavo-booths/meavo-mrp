@@ -1,7 +1,7 @@
 import "server-only";
 
 import { env } from "@/lib/env";
-import { getServerSupabase, getServiceSupabase } from "@/lib/auth/supabase-server";
+import { getServiceSupabase } from "@/lib/auth/supabase-server";
 
 export const ORIGINALS_BUCKET = env.SUPABASE_BUCKET_ORIGINALS;
 export const THUMBNAILS_BUCKET = env.SUPABASE_BUCKET_THUMBNAILS;
@@ -23,15 +23,19 @@ export function buildThumbnailPath(opts: {
 }
 
 /**
- * Upload an original document (image or PDF). Uses the user's session client so
- * Storage RLS can enforce per-user access.
+ * Upload an original document (image or PDF).
+ *
+ * Uses the service-role client because cookie-based auth in Route Handlers can
+ * be unreliable across runtimes — and the calling API route has already
+ * authorized the user via `getSessionUser()`. RLS on `storage.objects` remains
+ * a defense-in-depth layer for any direct client access.
  */
 export async function uploadOriginal(
   path: string,
   body: Blob | ArrayBuffer | Uint8Array,
   contentType: string,
 ) {
-  const supabase = await getServerSupabase();
+  const supabase = getServiceSupabase();
   const { data, error } = await supabase.storage
     .from(ORIGINALS_BUCKET)
     .upload(path, body, {
@@ -43,7 +47,7 @@ export async function uploadOriginal(
 }
 
 export async function downloadOriginalBytes(path: string): Promise<Uint8Array> {
-  const supabase = await getServerSupabase();
+  const supabase = getServiceSupabase();
   const { data, error } = await supabase.storage
     .from(ORIGINALS_BUCKET)
     .download(path);
@@ -60,23 +64,10 @@ export async function getOriginalSignedUrl(
   path: string,
   expiresInSec = 60 * 60,
 ) {
-  const supabase = await getServerSupabase();
+  const supabase = getServiceSupabase();
   const { data, error } = await supabase.storage
     .from(ORIGINALS_BUCKET)
     .createSignedUrl(path, expiresInSec);
   if (error) throw error;
   return data.signedUrl;
-}
-
-/** Bypass-RLS download (server-side only — uses service-role key). */
-export async function downloadOriginalBytesAsAdmin(
-  path: string,
-): Promise<Uint8Array> {
-  const supabase = getServiceSupabase();
-  const { data, error } = await supabase.storage
-    .from(ORIGINALS_BUCKET)
-    .download(path);
-  if (error) throw error;
-  const arrayBuf = await data.arrayBuffer();
-  return new Uint8Array(arrayBuf);
 }

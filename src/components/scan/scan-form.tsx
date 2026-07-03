@@ -130,8 +130,7 @@ export function ScanForm({ strings }: { strings: ScanFormStrings }) {
           body: formData,
         });
         if (!upRes.ok) {
-          const msg = await upRes.text();
-          throw new Error(msg || strings.errorUpload);
+          throw new Error(await readError(upRes, strings.errorUpload));
         }
         const { id } = (await upRes.json()) as { id: string };
 
@@ -140,8 +139,7 @@ export function ScanForm({ strings }: { strings: ScanFormStrings }) {
           method: "POST",
         });
         if (!extractRes.ok) {
-          const msg = await extractRes.text();
-          throw new Error(msg || strings.errorExtract);
+          throw new Error(await readError(extractRes, strings.errorExtract));
         }
 
         setStage("done");
@@ -366,4 +364,18 @@ function replaceExt(name: string, ext: string) {
   const dot = name.lastIndexOf(".");
   if (dot < 0) return `${name}.${ext}`;
   return `${name.slice(0, dot)}.${ext}`;
+}
+
+async function readError(res: Response, fallback: string): Promise<string> {
+  const ct = res.headers.get("content-type") ?? "";
+  try {
+    if (ct.includes("application/json")) {
+      const j = (await res.json()) as { error?: string; message?: string };
+      return j.error || j.message || `${fallback} (HTTP ${res.status})`;
+    }
+    const text = await res.text();
+    return text.trim() || `${fallback} (HTTP ${res.status})`;
+  } catch {
+    return `${fallback} (HTTP ${res.status})`;
+  }
 }

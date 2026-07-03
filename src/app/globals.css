@@ -29,67 +29,72 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
 
-  /* Domain-specific status colors */
+  --color-meavo-cream: #faf9f7;
+  --color-meavo-beige: #ece8e1;
+  --color-meavo-green: #0c8f61;
+  --color-meavo-black: #212121;
+  --color-meavo-pink: #eedcdc;
+  --color-meavo-yellow: #f4e3b1;
+  --color-meavo-blue: #e1e9ec;
+  --color-meavo-beige-300: #f2f0eb;
+  --color-meavo-beige-600: #d7d3cd;
+  --color-meavo-grey-300: #727272;
+
   --color-zone-local: var(--zone-local);
   --color-zone-eu: var(--zone-eu);
   --color-zone-non-eu: var(--zone-non-eu);
   --color-warn: var(--warn);
 }
 
+/* MEAVO brand — light theme (style guide) */
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --radius: 0.75rem;
+  --background: #faf9f7;
+  --foreground: #212121;
+  --card: #ffffff;
+  --card-foreground: #212121;
+  --popover: #ffffff;
+  --popover-foreground: #212121;
+  --primary: #0c8f61;
+  --primary-foreground: #faf9f7;
+  --secondary: #ece8e1;
+  --secondary-foreground: #212121;
+  --muted: #f2f0eb;
+  --muted-foreground: #727272;
+  --accent: #e1e9ec;
+  --accent-foreground: #212121;
+  --destructive: #c53030;
+  --destructive-foreground: #faf9f7;
+  --border: #d7d3cd;
+  --input: #d7d3cd;
+  --ring: #0c8f61;
 
-  /* Delivery zone tints (lightly saturated to read on white) */
-  --zone-local: oklch(0.78 0.13 150); /* green */
-  --zone-eu: oklch(0.78 0.12 250); /* blue */
-  --zone-non-eu: oklch(0.78 0.13 60); /* amber */
-  --warn: oklch(0.83 0.16 90); /* amber for low-confidence fields */
+  --zone-local: #0c8f61;
+  --zone-eu: #5b8a9a;
+  --zone-non-eu: #c9a227;
+  --warn: #f4e3b1;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(1 0 0 / 12%);
-  --input: oklch(1 0 0 / 14%);
-  --ring: oklch(0.556 0 0);
-
-  --zone-local: oklch(0.65 0.15 150);
-  --zone-eu: oklch(0.65 0.15 250);
-  --zone-non-eu: oklch(0.65 0.15 60);
-  --warn: oklch(0.75 0.18 90);
+  --background: #212121;
+  --foreground: #faf9f7;
+  --card: #2a2a2a;
+  --card-foreground: #faf9f7;
+  --popover: #2a2a2a;
+  --popover-foreground: #faf9f7;
+  --primary: #0c8f61;
+  --primary-foreground: #faf9f7;
+  --secondary: #3a3a3a;
+  --secondary-foreground: #faf9f7;
+  --muted: #3a3a3a;
+  --muted-foreground: #eaeaea;
+  --accent: #3a3a3a;
+  --accent-foreground: #faf9f7;
+  --destructive: #e53e3e;
+  --destructive-foreground: #faf9f7;
+  --border: #727272;
+  --input: #727272;
+  --ring: #0c8f61;
 }
 
 @layer base {
@@ -104,11 +109,29 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: var(--font-sans), system-ui, -apple-system, "Segoe UI",
-      Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-family: var(--font-sans), system-ui, -apple-system, "Segoe UI", Roboto,
+      sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+    letter-spacing: 0.01em;
   }
 
-  /* Larger touch targets on small viewports */
+  h1 {
+    @apply text-[2.375rem] font-medium leading-[1.08] tracking-[-0.02em] sm:text-[3.625rem];
+  }
+
+  h2 {
+    @apply text-[1.875rem] font-medium leading-[1.12] tracking-[-0.02em] sm:text-[3.25rem];
+  }
+
+  h3 {
+    @apply text-[1.75rem] font-semibold leading-[1.3] sm:text-[2.875rem] sm:font-medium sm:leading-[1.1] sm:tracking-[-0.02em];
+  }
+
+  h4 {
+    @apply text-2xl font-semibold leading-[1.3];
+  }
+
   @media (max-width: 640px) {
     button,
     [role="button"],
@@ -117,5 +140,27 @@
     textarea {
       min-height: 44px;
     }
+  }
+}
+
+@layer utilities {
+  .text-page-title {
+    @apply text-[1.875rem] font-medium leading-[1.12] tracking-[-0.02em] sm:text-[2.875rem] sm:leading-[1.08];
+  }
+
+  .surface-beige {
+    @apply bg-secondary;
+  }
+
+  .surface-accent-pink {
+    background-color: #eedcdc;
+  }
+
+  .surface-accent-yellow {
+    background-color: #f4e3b1;
+  }
+
+  .surface-accent-blue {
+    background-color: #e1e9ec;
   }
 }

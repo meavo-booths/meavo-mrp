@@ -1,4 +1,4 @@
-# Meavo Stock
+# Meavo MRP
 
 > Bulgarian-first AI invoice scanner with Zeron ERP sync.
 

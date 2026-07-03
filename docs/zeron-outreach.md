@@ -33,7 +33,7 @@ lives next to the code that consumes it.
 
 Казвам се <ИМЕ>, от <КОМПАНИЯ>. Използваме Zeron като ERP/CRM система за
 доставчици, фактури и складова отчетност, и в момента разработваме
-вътрешно мобилно/уеб приложение („Meavo Stock”), което автоматично:
+вътрешно мобилно/уеб приложение („Meavo MRP”), което автоматично:
 
   1) сканира фактури, проформи и стокови разписки от телефона на склада,
   2) извлича структурираните данни с помощта на AI (Gemini),
@@ -84,7 +84,7 @@ Hello,
 
 My name is <NAME>, working at <COMPANY> in Sofia. We use Zeron as the ERP
 for suppliers, invoices, and warehouse stock. We are currently building an
-internal mobile/web application ("Meavo Stock") that:
+internal mobile/web application ("Meavo MRP") that:
 
   1) photographs supplier invoices, proforma invoices and delivery notes
      from a warehouse worker's phone,

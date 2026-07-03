@@ -1,8 +1,8 @@
 import { setRequestLocale, getTranslations } from "next-intl/server";
-import { redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 
 import { ScanForm } from "@/components/scan/scan-form";
-import { getSessionUser } from "@/lib/auth/session";
+import { isInvoiceScannerEnabled } from "@/lib/features";
 
 export const dynamic = "force-dynamic";
 
@@ -14,10 +14,7 @@ export default async function ScanPage({
   const { locale } = await params;
   setRequestLocale(locale);
 
-  const user = await getSessionUser();
-  if (!user) {
-    redirect(`/${locale}/login?next=${encodeURIComponent(`/${locale}/scan`)}`);
-  }
+  if (!isInvoiceScannerEnabled()) notFound();
 
   const t = await getTranslations("scan");
   const types = await getTranslations("scan.documentType");

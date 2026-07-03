@@ -1,6 +1,6 @@
 # Google OAuth setup (~10 minutes)
 
-Goal: let teammates sign in to Meavo Stock with their company Google
+Goal: let teammates sign in to Meavo MRP with their company Google
 account. We achieve this by:
 
 1. Creating a Google Cloud OAuth client (we don't pay anything; this only
@@ -29,12 +29,12 @@ to enable Google in Supabase yet.
 ## 2. Create the Google OAuth client
 
 1. Open <https://console.cloud.google.com> with the company Google account.
-2. Top-left project picker → **New project** → name it `meavo-stock-auth`
+2. Top-left project picker → **New project** → name it `meavo-mrp-auth`
    → Create → switch to it.
 3. Left nav → **APIs & Services → OAuth consent screen**:
    - **User type**: choose `Internal` if you have Google Workspace; else
      `External`.
-   - **App name**: `Meavo Stock`.
+   - **App name**: `Meavo MRP`.
    - **User support email**: your admin email.
    - **App logo**: optional (square PNG).
    - **App domain → Application home page**: `https://stock.yourcompany.bg`
@@ -46,7 +46,7 @@ to enable Google in Supabase yet.
 4. Left nav → **APIs & Services → Credentials → Create credentials → OAuth
    client ID**:
    - **Application type**: `Web application`.
-   - **Name**: `Meavo Stock — Web`.
+   - **Name**: `Meavo MRP — Web`.
    - **Authorized JavaScript origins**: paste
      - `http://localhost:3000`
      - `https://stock.yourcompany.bg` (your production URL)
