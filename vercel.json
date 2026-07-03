@@ -3,7 +3,7 @@
   "regions": ["fra1"],
   "framework": "nextjs",
   "functions": {
-    "src/app/api/scan/extract/route.ts": {
+    "src/app/api/documents/[id]/extract/route.ts": {
       "maxDuration": 60
     },
     "src/app/api/zeron/sync/route.ts": {
