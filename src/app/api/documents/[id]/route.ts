@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
 
 import { invoiceScannerDisabledResponse, requireApiUser } from "@/lib/api/guard";
-import { db, schema } from "@/lib/db/client";
-import { getOriginalSignedUrl } from "@/lib/storage/buckets";
+import { prisma } from "@/lib/prisma";
 import {
   ExtractedDocumentSchema,
   type ExtractedDocument,
@@ -12,7 +10,18 @@ import { saveExtraction } from "@/lib/documents/save";
 
 export const runtime = "nodejs";
 
-/** GET /api/documents/[id] — full document with signed URL and line items. */
+/** BigInt columns cannot be JSON.stringify-ed — convert before returning. */
+function serializeDocument<T extends { originalSizeBytes: bigint | null }>(
+  doc: T,
+) {
+  return {
+    ...doc,
+    originalSizeBytes:
+      doc.originalSizeBytes === null ? null : Number(doc.originalSizeBytes),
+  };
+}
+
+/** GET /api/documents/[id] — full document with file URL and line items. */
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -23,28 +32,28 @@ export async function GET(
   if (error) return error;
   const { id } = await params;
 
-  const document = await db.query.documents.findFirst({
-    where: eq(schema.documents.id, id),
+  const document = await prisma.mrpDocument.findUnique({
+    where: { id },
   });
   if (!document)
     return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (document.createdBy !== user.id) {
+  if (document.createdById !== user.id) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const lineItems = await db.query.lineItems.findMany({
-    where: eq(schema.lineItems.documentId, id),
-    orderBy: (li, { asc }) => [asc(li.position)],
+  const lineItems = await prisma.mrpLineItem.findMany({
+    where: { documentId: id },
+    orderBy: { position: "asc" },
   });
 
-  let signedUrl: string | null = null;
-  try {
-    signedUrl = await getOriginalSignedUrl(document.originalFilePath, 60 * 60);
-  } catch {
-    signedUrl = null;
-  }
+  // Private blobs are streamed through the authorized file route.
+  const signedUrl = `/api/documents/${id}/file`;
 
-  return NextResponse.json({ document, lineItems, signedUrl });
+  return NextResponse.json({
+    document: serializeDocument(document),
+    lineItems,
+    signedUrl,
+  });
 }
 
 /** PATCH /api/documents/[id] — save a draft of the user-edited extraction. */

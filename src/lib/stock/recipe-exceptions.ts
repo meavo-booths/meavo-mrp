@@ -1,9 +1,7 @@
 import "server-only";
 
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
-
-import { db, schema } from "@/lib/db/client";
 import type { BoothMarket } from "@/lib/import/schemas";
+import { prisma } from "@/lib/prisma";
 import { lineMatchesColour, lineMatchesMarket } from "@/lib/stock/bom-match";
 
 export type RecipeExceptionSummary = {
@@ -73,67 +71,39 @@ function formatChangeSummary(
 export async function listRecipeExceptions(
   status: "active" | "reverted" | "all" = "active",
 ): Promise<RecipeExceptionSummary[]> {
-  const rows = await db
-    .select({
-      id: schema.recipeExceptions.id,
-      name: schema.recipeExceptions.name,
-      notes: schema.recipeExceptions.notes,
-      status: schema.recipeExceptions.status,
-      createdAt: schema.recipeExceptions.createdAt,
-      revertedAt: schema.recipeExceptions.revertedAt,
-    })
-    .from(schema.recipeExceptions)
-    .where(
-      status === "all"
-        ? sql`true`
-        : eq(schema.recipeExceptions.status, status),
-    )
-    .orderBy(desc(schema.recipeExceptions.createdAt));
+  const rows = await prisma.mrpRecipeException.findMany({
+    where: status === "all" ? undefined : { status },
+    orderBy: { createdAt: "desc" },
+    include: {
+      scopes: { include: { boothModel: { select: { name: true } } } },
+      batchLinks: { select: { batchLabel: true } },
+      lineChanges: {
+        include: { material: { select: { code: true, name: true } } },
+      },
+    },
+  });
 
-  const summaries: RecipeExceptionSummary[] = [];
-  for (const row of rows) {
-    const scopes = await db
-      .select({ name: schema.boothModels.name })
-      .from(schema.recipeExceptionScopes)
-      .innerJoin(
-        schema.boothModels,
-        eq(schema.recipeExceptionScopes.boothModelId, schema.boothModels.id),
-      )
-      .where(eq(schema.recipeExceptionScopes.exceptionId, row.id));
-
-    const batches = await db
-      .select({ batchLabel: schema.recipeExceptionBatchLinks.batchLabel })
-      .from(schema.recipeExceptionBatchLinks)
-      .where(eq(schema.recipeExceptionBatchLinks.exceptionId, row.id));
-
-    const changes = await db
-      .select({
-        changeType: schema.recipeExceptionLineChanges.changeType,
-        quantity: schema.recipeExceptionLineChanges.quantity,
-        code: schema.materials.code,
-        name: schema.materials.name,
-      })
-      .from(schema.recipeExceptionLineChanges)
-      .innerJoin(
-        schema.materials,
-        eq(schema.recipeExceptionLineChanges.materialId, schema.materials.id),
-      )
-      .where(eq(schema.recipeExceptionLineChanges.exceptionId, row.id));
-
+  return rows.map((row) => {
+    const changes = row.lineChanges.map((c) => ({
+      changeType: c.changeType,
+      quantity: c.quantity.toString(),
+      code: c.material.code,
+      name: c.material.name,
+    }));
     const remove = changes.find((c) => c.changeType === "remove");
     const adds = changes.filter((c) => c.changeType === "add");
 
-    summaries.push({
+    return {
       id: row.id,
       name: row.name,
       notes: row.notes,
       status: row.status,
       createdAt: row.createdAt,
       revertedAt: row.revertedAt,
-      modelNames: [...new Set(scopes.map((s) => s.name))].sort((a, b) =>
-        a.localeCompare(b, "bg"),
+      modelNames: [...new Set(row.scopes.map((s) => s.boothModel.name))].sort(
+        (a, b) => a.localeCompare(b, "bg"),
       ),
-      batchLabels: batches.map((b) => b.batchLabel),
+      batchLabels: row.batchLinks.map((b) => b.batchLabel),
       changeSummary: remove
         ? formatChangeSummary(
             { code: remove.code, name: remove.name, qty: remove.quantity },
@@ -144,10 +114,8 @@ export async function listRecipeExceptions(
             })),
           )
         : "",
-    });
-  }
-
-  return summaries;
+    };
+  });
 }
 
 export async function listPanelsForModels(
@@ -155,17 +123,14 @@ export async function listPanelsForModels(
 ): Promise<string[]> {
   if (boothModelIds.length === 0) return [];
 
-  const rows = await db
-    .select({ simpleName: schema.boothElements.simpleName })
-    .from(schema.boothElements)
-    .where(
-      and(
-        inArray(schema.boothElements.boothModelId, boothModelIds),
-        eq(schema.boothElements.isActive, true),
-      ),
-    )
-    .groupBy(schema.boothElements.simpleName)
-    .orderBy(asc(schema.boothElements.simpleName));
+  const rows = await prisma.mrpBoothElement.groupBy({
+    by: ["simpleName"],
+    where: {
+      boothModelId: { in: boothModelIds },
+      isActive: true,
+    },
+    orderBy: { simpleName: "asc" },
+  });
 
   return rows.map((r) => r.simpleName);
 }
@@ -180,45 +145,24 @@ export async function listBomLinesForPicker(input: {
     return [];
   }
 
-  const rows = await db
-    .select({
-      id: schema.elementBomLines.id,
-      boothModelId: schema.boothModels.id,
-      boothModelName: schema.boothModels.name,
-      boothElementId: schema.boothElements.id,
-      simpleName: schema.boothElements.simpleName,
-      materialId: schema.materials.id,
-      materialCode: schema.materials.code,
-      materialName: schema.materials.name,
-      quantity: schema.elementBomLines.quantity,
-      colour: schema.elementBomLines.colour,
-      market: schema.elementBomLines.market,
-    })
-    .from(schema.elementBomLines)
-    .innerJoin(
-      schema.boothElements,
-      eq(schema.elementBomLines.boothElementId, schema.boothElements.id),
-    )
-    .innerJoin(
-      schema.boothModels,
-      eq(schema.boothElements.boothModelId, schema.boothModels.id),
-    )
-    .innerJoin(
-      schema.materials,
-      eq(schema.elementBomLines.materialId, schema.materials.id),
-    )
-    .where(
-      and(
-        inArray(schema.boothModels.id, input.boothModelIds),
-        eq(schema.boothElements.simpleName, input.simpleName),
-      ),
-    )
-    .orderBy(
-      asc(schema.boothModels.name),
-      asc(schema.materials.code),
-      asc(schema.elementBomLines.colour),
-      asc(schema.elementBomLines.market),
-    );
+  const rows = await prisma.mrpElementBomLine.findMany({
+    where: {
+      boothElement: {
+        boothModelId: { in: input.boothModelIds },
+        simpleName: input.simpleName,
+      },
+    },
+    include: {
+      boothElement: { include: { boothModel: true } },
+      material: true,
+    },
+    orderBy: [
+      { boothElement: { boothModel: { name: "asc" } } },
+      { material: { code: "asc" } },
+      { colour: "asc" },
+      { market: "asc" },
+    ],
+  });
 
   return rows
     .filter((row) => {
@@ -233,7 +177,16 @@ export async function listBomLinesForPicker(input: {
       return colourOk;
     })
     .map((row) => ({
-      ...row,
+      id: row.id,
+      boothModelId: row.boothElement.boothModel.id,
+      boothModelName: row.boothElement.boothModel.name,
+      boothElementId: row.boothElement.id,
+      simpleName: row.boothElement.simpleName,
+      materialId: row.material.id,
+      materialCode: row.material.code,
+      materialName: row.material.name,
+      quantity: row.quantity.toString(),
+      colour: row.colour,
       market: asBoothMarket(row.market),
     }));
 }
@@ -251,60 +204,61 @@ export async function createRecipeException(
     throw new Error("Link at least one batch");
   }
 
-  const source = await db
-    .select({
-      id: schema.elementBomLines.id,
-      boothElementId: schema.elementBomLines.boothElementId,
-      boothModelId: schema.boothElements.boothModelId,
-      simpleName: schema.boothElements.simpleName,
-      materialId: schema.elementBomLines.materialId,
-      quantity: schema.elementBomLines.quantity,
-      colour: schema.elementBomLines.colour,
-      market: schema.elementBomLines.market,
-    })
-    .from(schema.elementBomLines)
-    .innerJoin(
-      schema.boothElements,
-      eq(schema.elementBomLines.boothElementId, schema.boothElements.id),
-    )
-    .where(eq(schema.elementBomLines.id, input.sourceBomLineId))
-    .limit(1);
+  const source = await prisma.mrpElementBomLine.findUnique({
+    where: { id: input.sourceBomLineId },
+    include: {
+      boothElement: { select: { boothModelId: true, simpleName: true } },
+    },
+  });
 
-  const sourceLine = source[0];
-  if (!sourceLine) {
+  if (!source) {
     throw new Error("Selected recipe line not found");
   }
+  const sourceLine = {
+    id: source.id,
+    boothElementId: source.boothElementId,
+    boothModelId: source.boothElement.boothModelId,
+    simpleName: source.boothElement.simpleName,
+    materialId: source.materialId,
+    quantity: source.quantity,
+    colour: source.colour,
+    market: source.market,
+  };
   if (!input.boothModelIds.includes(sourceLine.boothModelId)) {
     throw new Error("Selected line does not belong to chosen models");
   }
 
-  return db.transaction(async (tx) => {
-    const [exception] = await tx
-      .insert(schema.recipeExceptions)
-      .values({
+  return prisma.$transaction(async (tx) => {
+    const exception = await tx.mrpRecipeException.create({
+      data: {
         name: input.name.trim(),
         notes: input.notes?.trim() || null,
-        createdBy: input.createdBy ?? null,
-      })
-      .returning({ id: schema.recipeExceptions.id });
+        createdById: input.createdBy ?? null,
+      },
+      select: { id: true },
+    });
 
-    const exceptionId = exception!.id;
+    const exceptionId = exception.id;
     const scopeColour = input.scopeColour?.trim() || null;
     const scopeMarket = input.scopeMarket ?? null;
 
     for (const boothModelId of input.boothModelIds) {
-      await tx.insert(schema.recipeExceptionScopes).values({
-        exceptionId,
-        boothModelId,
-        colour: scopeColour,
-        market: scopeMarket,
+      await tx.mrpRecipeExceptionScope.create({
+        data: {
+          exceptionId,
+          boothModelId,
+          colour: scopeColour,
+          market: scopeMarket,
+        },
       });
 
-      const element = await tx.query.boothElements.findFirst({
-        where: and(
-          eq(schema.boothElements.boothModelId, boothModelId),
-          eq(schema.boothElements.simpleName, sourceLine.simpleName),
-        ),
+      const element = await tx.mrpBoothElement.findUnique({
+        where: {
+          boothModelId_simpleName: {
+            boothModelId,
+            simpleName: sourceLine.simpleName,
+          },
+        },
       });
       if (!element) {
         throw new Error(
@@ -312,25 +266,29 @@ export async function createRecipeException(
         );
       }
 
-      await tx.insert(schema.recipeExceptionLineChanges).values({
-        exceptionId,
-        boothElementId: element.id,
-        changeType: "remove",
-        materialId: sourceLine.materialId,
-        quantity: sourceLine.quantity,
-        colour: sourceLine.colour,
-        market: sourceLine.market,
+      await tx.mrpRecipeExceptionLineChange.create({
+        data: {
+          exceptionId,
+          boothElementId: element.id,
+          changeType: "remove",
+          materialId: sourceLine.materialId,
+          quantity: sourceLine.quantity,
+          colour: sourceLine.colour,
+          market: sourceLine.market,
+        },
       });
 
       for (const line of input.replacementLines) {
-        await tx.insert(schema.recipeExceptionLineChanges).values({
-          exceptionId,
-          boothElementId: element.id,
-          changeType: "add",
-          materialId: line.materialId,
-          quantity: String(line.quantity),
-          colour: line.colour ?? sourceLine.colour,
-          market: line.market ?? sourceLine.market,
+        await tx.mrpRecipeExceptionLineChange.create({
+          data: {
+            exceptionId,
+            boothElementId: element.id,
+            changeType: "add",
+            materialId: line.materialId,
+            quantity: String(line.quantity),
+            colour: line.colour ?? sourceLine.colour,
+            market: line.market ?? sourceLine.market,
+          },
         });
       }
     }
@@ -341,18 +299,20 @@ export async function createRecipeException(
 
       let manufacturingBatchId = link.manufacturingBatchId ?? null;
       if (!manufacturingBatchId) {
-        const batch = await tx.query.manufacturingBatches.findFirst({
-          where: eq(schema.manufacturingBatches.name, label),
+        const batch = await tx.mrpManufacturingBatch.findFirst({
+          where: { name: label },
         });
         manufacturingBatchId = batch?.id ?? null;
       }
 
-      await tx.insert(schema.recipeExceptionBatchLinks).values({
-        exceptionId,
-        batchLabel: label,
-        manufacturingBatchId,
-        applyToWholeBatch: link.applyToWholeBatch,
-        boothIdTexts: link.boothIdTexts ?? [],
+      await tx.mrpRecipeExceptionBatchLink.create({
+        data: {
+          exceptionId,
+          batchLabel: label,
+          manufacturingBatchId,
+          applyToWholeBatch: link.applyToWholeBatch,
+          boothIdTexts: link.boothIdTexts ?? [],
+        },
       });
     }
 
@@ -361,16 +321,11 @@ export async function createRecipeException(
 }
 
 export async function revertRecipeException(id: string): Promise<void> {
-  await db
-    .update(schema.recipeExceptions)
-    .set({
+  await prisma.mrpRecipeException.updateMany({
+    where: { id, status: "active" },
+    data: {
       status: "reverted",
-      revertedAt: sql`now()`,
-    })
-    .where(
-      and(
-        eq(schema.recipeExceptions.id, id),
-        eq(schema.recipeExceptions.status, "active"),
-      ),
-    );
+      revertedAt: new Date(),
+    },
+  });
 }

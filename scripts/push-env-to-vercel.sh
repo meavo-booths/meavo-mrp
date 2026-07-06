@@ -13,13 +13,14 @@ cd "$ROOT"
 
 keys=(
   NEXT_PUBLIC_APP_URL
-  NEXT_PUBLIC_SUPABASE_URL
-  NEXT_PUBLIC_SUPABASE_ANON_KEY
-  SUPABASE_SERVICE_ROLE_KEY
   DATABASE_URL
-  DIRECT_DATABASE_URL
-  SUPABASE_BUCKET_ORIGINALS
-  SUPABASE_BUCKET_THUMBNAILS
+  AUTH_SECRET
+  AUTH_URL
+  AUTH_GOOGLE_ID
+  AUTH_GOOGLE_SECRET
+  MRP_TOOL_CARD_ID
+  GATEWAY_URL
+  BLOB_READ_WRITE_TOKEN
   GEMINI_API_KEY
   GEMINI_MODEL
   GEMINI_THINKING_BUDGET
@@ -49,7 +50,7 @@ for key in "${keys[@]}"; do
   fi
   echo "Setting $key on Vercel production..."
   vercel env rm "$key" production --yes 2>/dev/null || true
-  if [[ "$key" == SUPABASE_SERVICE_ROLE_KEY || "$key" == DATABASE_URL || "$key" == DIRECT_DATABASE_URL || "$key" == GEMINI_API_KEY ]]; then
+  if [[ "$key" == DATABASE_URL || "$key" == AUTH_SECRET || "$key" == AUTH_GOOGLE_SECRET || "$key" == BLOB_READ_WRITE_TOKEN || "$key" == GEMINI_API_KEY ]]; then
     vercel env add "$key" production --value "$value" --yes --sensitive
   else
     vercel env add "$key" production --value "$value" --yes

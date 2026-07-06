@@ -1,9 +1,7 @@
 import "server-only";
 
-import { asc, eq, inArray } from "drizzle-orm";
-
 import { parseCsv, rowsToObjects } from "@/lib/import/csv";
-import { db, schema } from "@/lib/db/client";
+import { prisma } from "@/lib/prisma";
 
 const DEFAULT_MASTER_DATA_SHEET_ID =
   "1YGDc0uuDF9DhSOV19JYceXqPmIL8tFfCmMNwlV0JwGQ";
@@ -15,10 +13,10 @@ export type BomMissingMaterial = {
 };
 
 async function listMaterialCodesInDb(): Promise<Set<string>> {
-  const rows = await db
-    .select({ code: schema.materials.code })
-    .from(schema.materials)
-    .where(eq(schema.materials.isActive, true));
+  const rows = await prisma.mrpMaterial.findMany({
+    where: { isActive: true },
+    select: { code: true },
+  });
   return new Set(
     rows.map((r) => r.code?.trim()).filter((c): c is string => Boolean(c)),
   );
@@ -40,16 +38,16 @@ function countBomCodes(
 }
 
 async function replaceBomMissingTable(missing: BomMissingMaterial[]) {
-  await db.delete(schema.bomMissingMaterialCodes);
+  await prisma.mrpBomMissingMaterialCode.deleteMany();
   if (missing.length === 0) return;
 
-  await db.insert(schema.bomMissingMaterialCodes).values(
-    missing.map((m) => ({
+  await prisma.mrpBomMissingMaterialCode.createMany({
+    data: missing.map((m) => ({
       code: m.code,
       bomLineCount: m.bomLineCount,
       updatedAt: new Date(),
     })),
-  );
+  });
 }
 
 /** Recompute from ElementBOM CSV rows (import) or parsed file content. */
@@ -86,19 +84,18 @@ export async function syncBomMissingFromMasterSheet(): Promise<BomMissingMateria
 
 export async function listBomMissingMaterials(): Promise<BomMissingMaterial[]> {
   const known = await listMaterialCodesInDb();
-  const rows = await db
-    .select()
-    .from(schema.bomMissingMaterialCodes)
-    .orderBy(asc(schema.bomMissingMaterialCodes.code));
+  const rows = await prisma.mrpBomMissingMaterialCode.findMany({
+    orderBy: { code: "asc" },
+  });
 
   const staleCodes = rows
     .map((r) => r.code)
     .filter((code) => known.has(code));
 
   if (staleCodes.length > 0) {
-    await db
-      .delete(schema.bomMissingMaterialCodes)
-      .where(inArray(schema.bomMissingMaterialCodes.code, staleCodes));
+    await prisma.mrpBomMissingMaterialCode.deleteMany({
+      where: { code: { in: staleCodes } },
+    });
   }
 
   return rows
@@ -110,9 +107,9 @@ export async function listBomMissingMaterials(): Promise<BomMissingMaterial[]> {
 export async function clearBomMissingMaterialCodes(codes: string[]) {
   const trimmed = codes.map((c) => c.trim()).filter(Boolean);
   if (trimmed.length === 0) return;
-  await db
-    .delete(schema.bomMissingMaterialCodes)
-    .where(inArray(schema.bomMissingMaterialCodes.code, trimmed));
+  await prisma.mrpBomMissingMaterialCode.deleteMany({
+    where: { code: { in: trimmed } },
+  });
 }
 
 /** Materials page: refresh from sheet, fall back to stored table. */

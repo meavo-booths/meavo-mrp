@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { Prisma } from "@prisma/client";
 
 import { invoiceScannerDisabledResponse, requireApiUser } from "@/lib/api/guard";
-import { db, schema } from "@/lib/db/client";
+import { prisma } from "@/lib/prisma";
 import { downloadOriginalBytes } from "@/lib/storage/buckets";
 import { extractDocument } from "@/lib/extractor";
 import { inferDeliveryZoneFromCountryCode } from "@/lib/extractor/zone";
@@ -29,17 +29,17 @@ export async function POST(
   if (error) return error;
   const { id } = await params;
 
-  const document = await db.query.documents.findFirst({
-    where: eq(schema.documents.id, id),
+  const document = await prisma.mrpDocument.findUnique({
+    where: { id },
   });
   if (!document) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (document.createdBy !== user.id) {
+  if (document.createdById !== user.id) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   let bytes: Uint8Array;
   try {
-    bytes = await downloadOriginalBytes(document.originalFilePath);
+    bytes = await downloadOriginalBytes(document.storageKey);
   } catch (e) {
     const msg = (e as Error).message;
     console.error("[extract] storage download failed:", msg);
@@ -92,46 +92,46 @@ export async function POST(
     inferDeliveryZoneFromCountryCode(ext.supplier?.countryCode ?? null);
 
   try {
-    await db
-    .update(schema.documents)
-    .set({
-      type: ext.type,
-      documentNumber: ext.documentNumber ?? null,
-      issueDate: ext.issueDate ? new Date(ext.issueDate) : null,
-      dueDate: ext.dueDate ? new Date(ext.dueDate) : null,
-      deliveryDate: ext.deliveryDate ? new Date(ext.deliveryDate) : null,
-      supplierId,
-      supplierNameRaw: ext.supplier?.name ?? null,
-      currency: ext.currency ?? null,
-      subtotal: ext.subtotal ?? null,
-      vatTotal: ext.vatTotal ?? null,
-      total: ext.total ?? null,
-      deliveryZone: inferredZone,
-      customsRef: ext.customsRef ?? null,
-      rawAiExtraction: result.document,
-      confidence: result.confidence,
-      extractorProvider: result.provider,
-      updatedAt: new Date(),
-    })
-    .where(eq(schema.documents.id, id));
+    await prisma.mrpDocument.update({
+      where: { id },
+      data: {
+        type: ext.type,
+        documentNumber: ext.documentNumber ?? null,
+        issueDate: ext.issueDate ? new Date(ext.issueDate) : null,
+        dueDate: ext.dueDate ? new Date(ext.dueDate) : null,
+        deliveryDate: ext.deliveryDate ? new Date(ext.deliveryDate) : null,
+        supplierId,
+        supplierNameRaw: ext.supplier?.name ?? null,
+        currency: ext.currency ?? null,
+        subtotal: ext.subtotal ?? null,
+        vatTotal: ext.vatTotal ?? null,
+        total: ext.total ?? null,
+        deliveryZone: inferredZone,
+        customsRef: ext.customsRef ?? null,
+        rawAiExtraction: result.document as unknown as Prisma.InputJsonValue,
+        confidence: result.confidence as unknown as Prisma.InputJsonValue,
+        extractorProvider: result.provider,
+        updatedAt: new Date(),
+      },
+    });
 
-  // Replace line items with the new extraction's lines.
-  await db.delete(schema.lineItems).where(eq(schema.lineItems.documentId, id));
-  if (ext.lineItems.length > 0) {
-    await db.insert(schema.lineItems).values(
-      ext.lineItems.map((li) => ({
-        documentId: id,
-        position: li.position,
-        name: li.name,
-        sku: li.sku ?? null,
-        quantity: li.quantity ?? null,
-        unit: li.unit ?? null,
-        unitPrice: li.unitPrice ?? null,
-        vatRate: li.vatRate ?? null,
-        lineTotal: li.lineTotal ?? null,
-      })),
-    );
-  }
+    // Replace line items with the new extraction's lines.
+    await prisma.mrpLineItem.deleteMany({ where: { documentId: id } });
+    if (ext.lineItems.length > 0) {
+      await prisma.mrpLineItem.createMany({
+        data: ext.lineItems.map((li) => ({
+          documentId: id,
+          position: li.position,
+          name: li.name,
+          sku: li.sku ?? null,
+          quantity: li.quantity ?? null,
+          unit: li.unit ?? null,
+          unitPrice: li.unitPrice ?? null,
+          vatRate: li.vatRate ?? null,
+          lineTotal: li.lineTotal ?? null,
+        })),
+      });
+    }
 
     return NextResponse.json({ ok: true, provider: result.provider });
   } catch (e) {

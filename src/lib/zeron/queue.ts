@@ -1,8 +1,8 @@
 import "server-only";
 
-import { eq, and } from "drizzle-orm";
+import { Prisma } from "@prisma/client";
 
-import { db, schema } from "@/lib/db/client";
+import { prisma } from "@/lib/prisma";
 import { getZeronAdapter } from "./factory";
 
 /**
@@ -21,41 +21,35 @@ export async function enqueueZeronSync(opts: {
   const adapter = getZeronAdapter();
 
   // Mark older attempts as not-current.
-  await db
-    .update(schema.syncAttempts)
-    .set({ isCurrent: false })
-    .where(
-      and(
-        eq(schema.syncAttempts.documentId, documentId),
-        eq(schema.syncAttempts.isCurrent, true),
-      ),
-    );
+  await prisma.mrpSyncAttempt.updateMany({
+    where: { documentId, isCurrent: true },
+    data: { isCurrent: false },
+  });
 
-  const [attempt] = await db
-    .insert(schema.syncAttempts)
-    .values({
+  const attempt = await prisma.mrpSyncAttempt.create({
+    data: {
       documentId,
       adapter: adapter.name,
       status: "running",
       isCurrent: true,
-    })
-    .returning();
+    },
+  });
 
   try {
-    const document = await db.query.documents.findFirst({
-      where: eq(schema.documents.id, documentId),
+    const document = await prisma.mrpDocument.findUnique({
+      where: { id: documentId },
     });
     if (!document) throw new Error("Document not found");
 
     const supplier = document.supplierId
-      ? (await db.query.suppliers.findFirst({
-          where: eq(schema.suppliers.id, document.supplierId),
-        })) ?? null
+      ? await prisma.mrpSupplier.findUnique({
+          where: { id: document.supplierId },
+        })
       : null;
 
-    const lineItems = await db.query.lineItems.findMany({
-      where: eq(schema.lineItems.documentId, documentId),
-      orderBy: (li, { asc }) => [asc(li.position)],
+    const lineItems = await prisma.mrpLineItem.findMany({
+      where: { documentId },
+      orderBy: { position: "asc" },
     });
 
     const result = await adapter.pushDocument({
@@ -64,40 +58,42 @@ export async function enqueueZeronSync(opts: {
       lineItems,
     });
 
-    await db
-      .update(schema.syncAttempts)
-      .set({
+    await prisma.mrpSyncAttempt.update({
+      where: { id: attempt.id },
+      data: {
         status: "succeeded",
-        response: result.raw ?? { message: result.message },
+        response: (result.raw ?? {
+          message: result.message,
+        }) as Prisma.InputJsonValue,
         completedAt: new Date(),
-      })
-      .where(eq(schema.syncAttempts.id, attempt.id));
+      },
+    });
 
-    await db
-      .update(schema.documents)
-      .set({
+    await prisma.mrpDocument.update({
+      where: { id: documentId },
+      data: {
         status: "synced",
         syncedAt: new Date(),
         zeronId: result.externalId ?? document.zeronId ?? null,
-      })
-      .where(eq(schema.documents.id, documentId));
+      },
+    });
 
     return { ok: true, message: result.message };
   } catch (e) {
     const error = (e as Error).message;
-    await db
-      .update(schema.syncAttempts)
-      .set({
+    await prisma.mrpSyncAttempt.update({
+      where: { id: attempt.id },
+      data: {
         status: "failed",
         error,
         completedAt: new Date(),
-      })
-      .where(eq(schema.syncAttempts.id, attempt.id));
+      },
+    });
 
-    await db
-      .update(schema.documents)
-      .set({ status: "sync_failed" })
-      .where(eq(schema.documents.id, documentId));
+    await prisma.mrpDocument.update({
+      where: { id: documentId },
+      data: { status: "sync_failed" },
+    });
 
     return { ok: false, error };
   }

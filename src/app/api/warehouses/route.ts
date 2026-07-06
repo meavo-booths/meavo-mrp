@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import { asc, eq } from "drizzle-orm";
 
 import { requireApiUser } from "@/lib/api/guard";
-import { db, schema } from "@/lib/db/client";
+import { prisma } from "@/lib/prisma";
 import { ensureStockReferenceData } from "@/lib/stock";
 
 export const runtime = "nodejs";
@@ -13,11 +12,10 @@ export async function GET() {
 
   await ensureStockReferenceData();
 
-  const rows = await db
-    .select()
-    .from(schema.warehouses)
-    .where(eq(schema.warehouses.isActive, true))
-    .orderBy(asc(schema.warehouses.name));
+  const rows = await prisma.mrpWarehouse.findMany({
+    where: { isActive: true },
+    orderBy: { name: "asc" },
+  });
 
   return NextResponse.json({ warehouses: rows });
 }

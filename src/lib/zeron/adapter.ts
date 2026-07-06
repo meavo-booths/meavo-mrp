@@ -13,15 +13,15 @@
  */
 
 import type {
-  DocumentRow,
-  LineItemRow,
-  Supplier,
-} from "@/lib/db/schema";
+  MrpDocument,
+  MrpLineItem,
+  MrpSupplier,
+} from "@prisma/client";
 
 export type ZeronPushPayload = {
-  document: DocumentRow;
-  supplier: Supplier | null;
-  lineItems: LineItemRow[];
+  document: MrpDocument;
+  supplier: MrpSupplier | null;
+  lineItems: MrpLineItem[];
 };
 
 export type ZeronPushResult = {

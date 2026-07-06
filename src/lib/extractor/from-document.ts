@@ -1,22 +1,20 @@
 /**
- * Build an {@link ExtractedDocument} from a {@link DocumentRow} and its line
+ * Build an {@link ExtractedDocument} from a {@link MrpDocument} and its line
  * items — used to produce the form's default values when there is no
  * `final_extraction` yet (e.g. the user has just finished an extraction and
  * is reviewing it for the first time).
  */
 
-import type {
-  DocumentRow,
-  LineItemRow,
-} from "@/lib/db/schema";
+import type { MrpDocument, MrpLineItem } from "@prisma/client";
+
 import type { ExtractedDocument } from "./schema";
 
 const isoDate = (d: Date | string | null | undefined) =>
   d ? new Date(d).toISOString().slice(0, 10) : null;
 
 export function buildDefaultsFromDocument(
-  doc: DocumentRow,
-  lineItems: LineItemRow[],
+  doc: MrpDocument,
+  lineItems: MrpLineItem[],
 ): ExtractedDocument {
   const ai = (doc.rawAiExtraction ?? null) as Partial<ExtractedDocument> | null;
   const final = (doc.finalExtraction ?? null) as Partial<ExtractedDocument> | null;
@@ -36,9 +34,9 @@ export function buildDefaultsFromDocument(
       address: final?.supplier?.address ?? ai?.supplier?.address ?? null,
     },
     currency: final?.currency ?? ai?.currency ?? doc.currency ?? null,
-    subtotal: final?.subtotal ?? ai?.subtotal ?? doc.subtotal ?? null,
-    vatTotal: final?.vatTotal ?? ai?.vatTotal ?? doc.vatTotal ?? null,
-    total: final?.total ?? ai?.total ?? doc.total ?? null,
+    subtotal: final?.subtotal ?? ai?.subtotal ?? doc.subtotal?.toString() ?? null,
+    vatTotal: final?.vatTotal ?? ai?.vatTotal ?? doc.vatTotal?.toString() ?? null,
+    total: final?.total ?? ai?.total ?? doc.total?.toString() ?? null,
     deliveryZone:
       final?.deliveryZone ?? ai?.deliveryZone ?? doc.deliveryZone ?? null,
     customsRef: final?.customsRef ?? ai?.customsRef ?? doc.customsRef ?? null,
@@ -49,11 +47,11 @@ export function buildDefaultsFromDocument(
         position: li.position,
         name: li.name,
         sku: li.sku ?? null,
-        quantity: li.quantity ?? null,
+        quantity: li.quantity?.toString() ?? null,
         unit: li.unit ?? null,
-        unitPrice: li.unitPrice ?? null,
-        vatRate: li.vatRate ?? null,
-        lineTotal: li.lineTotal ?? null,
+        unitPrice: li.unitPrice?.toString() ?? null,
+        vatRate: li.vatRate?.toString() ?? null,
+        lineTotal: li.lineTotal?.toString() ?? null,
       })),
     needsReview: ai?.needsReview ?? true,
     notes: ai?.notes ?? null,

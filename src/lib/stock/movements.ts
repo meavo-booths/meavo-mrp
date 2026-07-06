@@ -1,16 +1,16 @@
 import "server-only";
 
-import { and, eq, sql } from "drizzle-orm";
+import type { MrpStockMovement, MrpStockMovementType } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 
-import { db, schema } from "@/lib/db/client";
-import type { StockMovement } from "@/lib/db/schema";
+import { prisma } from "@/lib/prisma";
 
 import { addDecimal, toDecimalString } from "./decimal";
 
 export type ApplyMovementInput = {
   warehouseId: string;
   materialId: string;
-  movementType: (typeof schema.stockMovementTypeEnum.enumValues)[number];
+  movementType: MrpStockMovementType;
   quantityDelta: string | number;
   effectiveAt: Date;
   notes?: string | null;
@@ -20,29 +20,28 @@ export type ApplyMovementInput = {
 };
 
 async function upsertBalance(
-  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  tx: Prisma.TransactionClient,
   warehouseId: string,
   materialId: string,
   delta: string,
 ) {
-  const existing = await tx.query.stockBalances.findFirst({
-    where: and(
-      eq(schema.stockBalances.warehouseId, warehouseId),
-      eq(schema.stockBalances.materialId, materialId),
-    ),
+  const existing = await tx.mrpStockBalance.findUnique({
+    where: { warehouseId_materialId: { warehouseId, materialId } },
   });
 
   if (existing) {
-    const next = addDecimal(existing.quantity, delta);
-    await tx
-      .update(schema.stockBalances)
-      .set({ quantity: next, updatedAt: sql`now()` })
-      .where(eq(schema.stockBalances.id, existing.id));
+    const next = addDecimal(existing.quantity.toString(), delta);
+    await tx.mrpStockBalance.update({
+      where: { id: existing.id },
+      data: { quantity: next },
+    });
   } else {
-    await tx.insert(schema.stockBalances).values({
-      warehouseId,
-      materialId,
-      quantity: toDecimalString(delta),
+    await tx.mrpStockBalance.create({
+      data: {
+        warehouseId,
+        materialId,
+        quantity: toDecimalString(delta),
+      },
     });
   }
 }
@@ -50,13 +49,12 @@ async function upsertBalance(
 /** Append ledger row and update stock_balances (+ materials.currentQuantity for default warehouse). */
 export async function applyMovement(
   input: ApplyMovementInput,
-): Promise<StockMovement> {
+): Promise<MrpStockMovement> {
   const delta = toDecimalString(input.quantityDelta);
 
-  return db.transaction(async (tx) => {
-    const [movement] = await tx
-      .insert(schema.stockMovements)
-      .values({
+  return prisma.$transaction(async (tx) => {
+    const movement = await tx.mrpStockMovement.create({
+      data: {
         warehouseId: input.warehouseId,
         materialId: input.materialId,
         movementType: input.movementType,
@@ -64,28 +62,30 @@ export async function applyMovement(
         effectiveAt: input.effectiveAt,
         notes: input.notes ?? null,
         referenceId: input.referenceId ?? null,
-        metadata: input.metadata ?? {},
-        createdBy: input.createdBy ?? null,
-      })
-      .returning();
+        metadata: (input.metadata ?? {}) as Prisma.InputJsonValue,
+        createdById: input.createdBy ?? null,
+      },
+    });
 
     await upsertBalance(tx, input.warehouseId, input.materialId, delta);
 
-    const warehouse = await tx.query.warehouses.findFirst({
-      where: eq(schema.warehouses.id, input.warehouseId),
+    const warehouse = await tx.mrpWarehouse.findUnique({
+      where: { id: input.warehouseId },
     });
     if (warehouse?.code === "aksakovo") {
-      const material = await tx.query.materials.findFirst({
-        where: eq(schema.materials.id, input.materialId),
+      const material = await tx.mrpMaterial.findUnique({
+        where: { id: input.materialId },
       });
       if (material) {
-        await tx
-          .update(schema.materials)
-          .set({
-            currentQuantity: addDecimal(material.currentQuantity, delta),
-            updatedAt: sql`now()`,
-          })
-          .where(eq(schema.materials.id, input.materialId));
+        await tx.mrpMaterial.update({
+          where: { id: input.materialId },
+          data: {
+            currentQuantity: addDecimal(
+              material.currentQuantity.toString(),
+              delta,
+            ),
+          },
+        });
       }
     }
 

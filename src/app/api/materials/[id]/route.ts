@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
 import { z } from "zod";
+import type { Prisma } from "@prisma/client";
 
 import { requireApiUser } from "@/lib/api/guard";
-import { db, schema } from "@/lib/db/client";
+import { prisma } from "@/lib/prisma";
 import { parseOptionalPrice } from "@/lib/import/schemas";
 import { clearBomMissingMaterialCodes } from "@/lib/stock/bom-missing";
 
@@ -26,14 +26,14 @@ export async function PATCH(
   const { id } = await params;
   const body = PatchSchema.parse(await request.json());
 
-  const existing = await db.query.materials.findFirst({
-    where: eq(schema.materials.id, id),
+  const existing = await prisma.mrpMaterial.findUnique({
+    where: { id },
   });
   if (!existing) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  let unitPriceEur = existing.unitPriceEur;
+  let unitPriceEur: Prisma.Decimal | string | null = existing.unitPriceEur;
   if (body.unitPriceEur !== undefined) {
     unitPriceEur =
       body.unitPriceEur === null || body.unitPriceEur === ""
@@ -41,17 +41,16 @@ export async function PATCH(
         : parseOptionalPrice(body.unitPriceEur);
   }
 
-  const [material] = await db
-    .update(schema.materials)
-    .set({
+  const material = await prisma.mrpMaterial.update({
+    where: { id },
+    data: {
       code: body.code !== undefined ? body.code : existing.code,
       name: body.name ?? existing.name,
       unit: body.unit ?? existing.unit,
       unitPriceEur,
       updatedAt: new Date(),
-    })
-    .where(eq(schema.materials.id, id))
-    .returning();
+    },
+  });
 
   if (material.code?.trim()) {
     await clearBomMissingMaterialCodes([material.code.trim()]);

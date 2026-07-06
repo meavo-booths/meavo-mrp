@@ -1,9 +1,8 @@
 import "server-only";
 
-import { and, eq } from "drizzle-orm";
+import type { MrpInventoryCount } from "@prisma/client";
 
-import { db, schema } from "@/lib/db/client";
-import type { InventoryCount } from "@/lib/db/schema";
+import { prisma } from "@/lib/prisma";
 
 import { toDecimalString } from "./decimal";
 import { resolveInventoryBatchCheckpoint } from "./inventory-batch";
@@ -23,15 +22,17 @@ export type RecordInventoryCountInput = {
 /** Physical count overwrites on-hand; variance row kept for audit. */
 export async function recordInventoryCount(
   input: RecordInventoryCountInput,
-): Promise<InventoryCount> {
+): Promise<MrpInventoryCount> {
   const counted = toDecimalString(input.countedQuantity);
-  const balance = await db.query.stockBalances.findFirst({
-    where: and(
-      eq(schema.stockBalances.warehouseId, input.warehouseId),
-      eq(schema.stockBalances.materialId, input.materialId),
-    ),
+  const balance = await prisma.mrpStockBalance.findUnique({
+    where: {
+      warehouseId_materialId: {
+        warehouseId: input.warehouseId,
+        materialId: input.materialId,
+      },
+    },
   });
-  const systemQty = balance?.quantity ?? "0";
+  const systemQty = balance?.quantity.toString() ?? "0";
   const variance = (
     Number(counted) - Number(systemQty)
   ).toFixed(4);
@@ -58,9 +59,8 @@ export async function recordInventoryCount(
     },
   });
 
-  const [row] = await db
-    .insert(schema.inventoryCounts)
-    .values({
+  const row = await prisma.mrpInventoryCount.create({
+    data: {
       warehouseId: input.warehouseId,
       materialId: input.materialId,
       countDate: input.countDate,
@@ -71,9 +71,9 @@ export async function recordInventoryCount(
       countedThroughBatchId: batch.countedThroughBatchId,
       countedThroughBatchLabel: batch.countedThroughBatchLabel,
       movementId: movement.id,
-      createdBy: input.createdBy ?? null,
-    })
-    .returning();
+      createdById: input.createdBy ?? null,
+    },
+  });
 
   return row;
 }

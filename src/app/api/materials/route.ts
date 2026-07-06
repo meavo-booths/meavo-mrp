@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
-import { asc, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { requireApiUser } from "@/lib/api/guard";
-import { db, schema } from "@/lib/db/client";
+import { prisma } from "@/lib/prisma";
 import { parseOptionalPrice } from "@/lib/import/schemas";
 import { clearBomMissingMaterialCodes } from "@/lib/stock/bom-missing";
 import { ensureStockReferenceData } from "@/lib/stock";
@@ -23,17 +22,16 @@ export async function GET() {
 
   await ensureStockReferenceData();
 
-  const rows = await db
-    .select()
-    .from(schema.materials)
-    .where(eq(schema.materials.isActive, true))
-    .orderBy(asc(schema.materials.name));
+  const rows = await prisma.mrpMaterial.findMany({
+    where: { isActive: true },
+    orderBy: { name: "asc" },
+  });
 
   return NextResponse.json({ materials: rows });
 }
 
 export async function POST(request: Request) {
-  const { user, error } = await requireApiUser();
+  const { error } = await requireApiUser();
   if (error) return error;
 
   const body = CreateSchema.parse(await request.json());
@@ -42,15 +40,14 @@ export async function POST(request: Request) {
       ? parseOptionalPrice(body.unitPriceEur)
       : null;
 
-  const [material] = await db
-    .insert(schema.materials)
-    .values({
+  const material = await prisma.mrpMaterial.create({
+    data: {
       code: body.code ?? null,
       name: body.name,
       unit: body.unit,
       unitPriceEur,
-    })
-    .returning();
+    },
+  });
 
   if (body.code?.trim()) {
     await clearBomMissingMaterialCodes([body.code.trim()]);

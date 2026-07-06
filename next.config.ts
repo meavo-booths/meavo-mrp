@@ -22,11 +22,10 @@ const nextConfig: NextConfig = {
   // Allow large file uploads (up to 25 MB) via server actions / route handlers.
   serverExternalPackages: ["pdfjs-dist"],
   images: {
-    // Optional: add Supabase project hostname as a remotePattern when known.
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "**.supabase.co",
+        hostname: "*.blob.vercel-storage.com",
       },
     ],
   },

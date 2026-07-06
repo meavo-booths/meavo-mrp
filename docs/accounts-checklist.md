@@ -33,11 +33,13 @@ Vercel; integration is slightly more manual.
 use)
 - During first project creation, pick **Frankfurt (`fra1`)** as the primary
 region
+- In the project → **Storage → Blob**, create a Blob store and connect it —
+this provisions the `BLOB_READ_WRITE_TOKEN` used for original document files
 - Calendar a reminder ~~3 days before the trial ends: upgrade to Pro
 (~~20 EUR/month) or pause go-live until you do
 
 **Why:** runs the webapp; deploys from GitHub on every push; free SSL;
-EU-region hosting.
+EU-region hosting; Vercel Blob stores the uploaded invoice files.
 
 **Free-tier (Hobby) limitations to be aware of:**
 
@@ -56,45 +58,31 @@ EU-region hosting.
 - Includes a **$20 monthly usage credit** for billable resources beyond the
 generous included allowances (1 TB bandwidth, 10M edge requests, etc.). The
 credit resets each month and is the same $20 you already pay — it is not an
-extra $20 on top.
+extra $20 on top. Blob storage and egress count toward this usage.
 
 ---
 
-## 3. Supabase — *Free tier first*
+## 3. Shared MEAVO Neon Postgres — *no new signup*
 
-- Sign up at [https://supabase.com](https://supabase.com)
-- Create a new project; **region: `eu-central-1` (Frankfurt)**
-- Save these into your password manager:
-  - Project URL (e.g. `https://xxxxx.supabase.co`)
-  - `anon` public key (safe for client)
-  - `service_role` key (server only — **never** expose to client)
-  - DB connection string (Settings → Database → Connection string → URI)
-- In **Authentication → Providers**, enable **Google** (we will paste OAuth
-credentials from step 5 here)
-- In **Storage**, create two buckets: `originals` (private) and `thumbnails`
-(private)
+MRP does not get its own database — it uses the shared MEAVO Neon Postgres
+already used by `meavo-gateway`. There is nothing to sign up for; you need:
 
-**Why:** managed Postgres + S3-compatible file storage + login system.
+- The pooled `DATABASE_URL` — copy the same value from
+  Vercel → meavo-gateway → Settings → Environment Variables
+- Access to the [`meavo-db`](https://github.com/meavo-booths/meavo-db) repo,
+  which owns the Prisma schema (all schema changes happen there; `db:push`
+  from this repo is disabled)
+- A gateway admin who can invite users and grant the MRP tool card
+  (`MRP_TOOL_CARD_ID`, default `seed-mrp-tool` — seeded in meavo-gateway):
+  a user can only sign in if they exist in the gateway `User` table **and**
+  have a `ToolCardAccess` row for that tool card
 
-**Free-tier limits that matter:**
+**Why:** one shared Postgres for all MEAVO tools; users and access live in
+the gateway, so there is no separate login system to manage.
 
-
-| Limit        | Free                      | Action when hit                               |
-| ------------ | ------------------------- | --------------------------------------------- |
-| File storage | **1 GB**                  | Watch in dashboard; upgrade to Pro at ~800 MB |
-| DB size      | 500 MB                    | Plenty for metadata; images are not in DB     |
-| Egress       | 5 GB/month                | Watch dashboard                               |
-| Auto-pause   | **after 7 days inactive** | Open the project to unpause, or upgrade       |
-| Backups      | none                      | Acceptable for pilot; not for production      |
-| Max upload   | 50 MB                     | Fine for invoice photos / single-page PDFs    |
-
-
-**Upgrade triggers (move to Pro at ~25 EUR/mo):**
-
-- Storage approaching 800 MB
-- App was auto-paused at least once and that became disruptive
-- You need automated daily backups
-- Egress / fair-use warnings appear
+**Limits that matter:** the Neon project is shared — watch storage and
+compute usage in the Neon console alongside the other MEAVO apps. See
+[`neon-setup.md`](./neon-setup.md) for details.
 
 ---
 
@@ -125,12 +113,13 @@ invoices at scale.
 External; fill app name, support email, logo (optional)
 - **APIs & Services → Credentials → Create credentials → OAuth client ID**
 - Application type: **Web application**
-- Authorized redirect URIs: paste the value Supabase shows in
-Authentication → Providers → Google
-- Save `client_id` and `client_secret` and paste them into Supabase Auth
-Google provider
+- Authorized redirect URIs: the app's own NextAuth callbacks —
+`https://mrp.meavo.app/api/auth/callback/google` and
+`http://localhost:3000/api/auth/callback/google`
+- Save `client_id` and `client_secret` and set them as `AUTH_GOOGLE_ID` /
+`AUTH_GOOGLE_SECRET` in `.env.local` and Vercel
 
-**Why:** lets the team sign in with their Google work accounts.
+**Why:** lets the team sign in with their Google work accounts (NextAuth).
 
 **Cost:** $0. We only use the OAuth feature, no paid Google Cloud services.
 
@@ -141,10 +130,12 @@ Google provider
 Skip this entirely if your team uses Google Workspace.
 
 - Sign in at [https://entra.microsoft.com](https://entra.microsoft.com)
-- App registrations → New registration → Web → add Supabase redirect URI
+- App registrations → New registration → Web → add the app's NextAuth
+callback (`https://mrp.meavo.app/api/auth/callback/microsoft-entra-id`) as
+a redirect URI
 - Generate a client secret; save the secret value (only shown once)
-- Paste `Application (client) ID`, `Directory (tenant) ID` and the secret
-into Supabase Auth Microsoft provider
+- Add the Microsoft Entra ID provider to NextAuth in `src/lib/auth.ts` and
+set its client ID / secret env vars
 
 **Cost:** $0.
 
@@ -152,11 +143,11 @@ into Supabase Auth Microsoft provider
 
 ## 7. Domain (existing — no signup) — *free if you already own it*
 
-- We use a subdomain like `stock.yourcompany.bg`
+- Production lives at `mrp.meavo.app`
 - After Vercel project exists, add **one** DNS record at your registrar:
 
 ```text
-Host:  stock          Type: CNAME       Value: cname.vercel-dns.com       TTL: auto
+Host:  mrp            Type: CNAME       Value: cname.vercel-dns.com       TTL: auto
 ```
 
 - Vercel issues and renews the SSL certificate automatically.
@@ -174,15 +165,19 @@ is in real use
 ## Where each secret goes
 
 
-| Secret                          | Local dev (`.env.local`) | Production (Vercel env vars)   |
-| ------------------------------- | ------------------------ | ------------------------------ |
-| `NEXT_PUBLIC_SUPABASE_URL`      | yes                      | yes                            |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | yes                      | yes                            |
-| `SUPABASE_SERVICE_ROLE_KEY`     | yes                      | yes (server only)              |
-| `DATABASE_URL`                  | yes                      | yes                            |
-| `GEMINI_API_KEY`                | yes                      | yes                            |
-| `GEMINI_MODEL`                  | yes                      | yes                            |
-| `NEXT_PUBLIC_APP_URL`           | `http://localhost:3000`  | `https://stock.yourcompany.bg` |
+| Secret                  | Local dev (`.env.local`) | Production (Vercel env vars) |
+| ----------------------- | ------------------------ | ---------------------------- |
+| `DATABASE_URL`          | yes                      | yes                          |
+| `AUTH_SECRET`           | yes                      | yes                          |
+| `AUTH_URL`              | `http://localhost:3000`  | `https://mrp.meavo.app`      |
+| `AUTH_GOOGLE_ID`        | yes                      | yes                          |
+| `AUTH_GOOGLE_SECRET`    | yes                      | yes                          |
+| `MRP_TOOL_CARD_ID`      | `seed-mrp-tool`          | `seed-mrp-tool`              |
+| `GATEWAY_URL`           | `https://meavo.app`      | `https://meavo.app`          |
+| `BLOB_READ_WRITE_TOKEN` | yes                      | yes                          |
+| `GEMINI_API_KEY`        | yes                      | yes                          |
+| `GEMINI_MODEL`          | yes                      | yes                          |
+| `NEXT_PUBLIC_APP_URL`   | `http://localhost:3000`  | `https://mrp.meavo.app`      |
 
 
 Never commit `.env.local`. Always use the **Environment Variables** UI in
@@ -193,10 +188,10 @@ Vercel for production secrets.
 ## Cost summary
 
 
-| Phase              | Vercel         | Supabase  | Gemini | Total          |
-| ------------------ | -------------- | --------- | ------ | -------------- |
-| Pilot (now)        | $0 (Pro trial) | $0 (Free) | ~$0–5  | **~$0–5/mo**   |
-| After Vercel trial | ~$20           | $0 (Free) | ~$5–10 | **~$25–30/mo** |
-| Production         | ~$20           | ~$25      | ~$5–15 | **~$50–60/mo** |
+| Phase              | Vercel         | Neon (shared)   | Gemini | Total          |
+| ------------------ | -------------- | --------------- | ------ | -------------- |
+| Pilot (now)        | $0 (Pro trial) | $0 (shared)     | ~$0–5  | **~$0–5/mo**   |
+| After Vercel trial | ~$20           | $0 (shared)     | ~$5–10 | **~$25–30/mo** |
+| Production         | ~$20           | shared w/ MEAVO | ~$5–15 | **~$25–35/mo** |
 
 

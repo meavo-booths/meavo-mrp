@@ -35,9 +35,9 @@ export const exportAdapter: ZeronAdapter = {
         SupplierEIK: payload.supplier?.eik ?? "",
         SupplierCountry: payload.supplier?.countryCode ?? "",
         Currency: payload.document.currency ?? "",
-        Subtotal: payload.document.subtotal ?? "",
-        VATTotal: payload.document.vatTotal ?? "",
-        Total: payload.document.total ?? "",
+        Subtotal: payload.document.subtotal?.toString() ?? "",
+        VATTotal: payload.document.vatTotal?.toString() ?? "",
+        Total: payload.document.total?.toString() ?? "",
         DeliveryZone: payload.document.deliveryZone ?? "",
         CustomsRef: payload.document.customsRef ?? "",
         ZeronInternalId: payload.document.id,
@@ -49,11 +49,11 @@ export const exportAdapter: ZeronAdapter = {
       Position: li.position,
       ItemName: li.name,
       SKU: li.sku ?? "",
-      Quantity: li.quantity ?? "",
+      Quantity: li.quantity?.toString() ?? "",
       Unit: li.unit ?? "",
-      UnitPrice: li.unitPrice ?? "",
-      VATRate: li.vatRate ?? "",
-      LineTotal: li.lineTotal ?? "",
+      UnitPrice: li.unitPrice?.toString() ?? "",
+      VATRate: li.vatRate?.toString() ?? "",
+      LineTotal: li.lineTotal?.toString() ?? "",
     }));
 
     const headerSheet = XLSX.utils.json_to_sheet(headerRow);

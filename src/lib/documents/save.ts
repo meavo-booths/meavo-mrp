@@ -1,12 +1,17 @@
 import "server-only";
 
-import { eq } from "drizzle-orm";
+import { Prisma } from "@prisma/client";
 
-import { db, schema } from "@/lib/db/client";
+import { prisma } from "@/lib/prisma";
 import type { ExtractedDocument } from "@/lib/extractor/schema";
 import { diffExtractions } from "@/lib/extractor/diff";
 import { findOrCreateSupplier } from "@/lib/suppliers/match";
 import { recordApprovedExtraction } from "@/lib/learning/profile";
+
+const toJsonInput = (value: unknown) =>
+  value === null || value === undefined
+    ? Prisma.JsonNull
+    : (value as Prisma.InputJsonValue);
 
 /**
  * Persist a (possibly user-edited) extraction back to the database, log the
@@ -21,11 +26,11 @@ export async function saveExtraction(opts: {
 }) {
   const { documentId, userId, extraction, finalize } = opts;
 
-  const existing = await db.query.documents.findFirst({
-    where: eq(schema.documents.id, documentId),
+  const existing = await prisma.mrpDocument.findUnique({
+    where: { id: documentId },
   });
   if (!existing) throw new Error("Document not found");
-  if (existing.createdBy !== userId) {
+  if (existing.createdById !== userId) {
     throw new Error("Forbidden");
   }
 
@@ -55,23 +60,23 @@ export async function saveExtraction(opts: {
   if (prevFinal) {
     const diffs = diffExtractions(prevFinal, extraction);
     if (diffs.length > 0) {
-      await db.insert(schema.correctionLogs).values(
-        diffs.map((d) => ({
+      await prisma.mrpCorrectionLog.createMany({
+        data: diffs.map((d) => ({
           documentId,
           supplierId,
           fieldPath: d.path,
-          aiValue: d.ai as never,
-          userValue: d.user as never,
-          correctedBy: userId,
+          aiValue: toJsonInput(d.ai),
+          userValue: toJsonInput(d.user),
+          correctedById: userId,
         })),
-      );
+      });
     }
   }
 
   // Persist the canonical fields in their own columns for sorting/filtering.
-  await db
-    .update(schema.documents)
-    .set({
+  await prisma.mrpDocument.update({
+    where: { id: documentId },
+    data: {
       type: extraction.type,
       documentNumber: extraction.documentNumber ?? null,
       issueDate: extraction.issueDate ? new Date(extraction.issueDate) : null,
@@ -87,21 +92,19 @@ export async function saveExtraction(opts: {
       total: extraction.total ?? null,
       deliveryZone: extraction.deliveryZone ?? null,
       customsRef: extraction.customsRef ?? null,
-      finalExtraction: extraction,
+      finalExtraction: extraction as unknown as Prisma.InputJsonValue,
       status: finalize ? "approved" : existing.status,
       approvedAt: finalize ? new Date() : existing.approvedAt,
-      approvedBy: finalize ? userId : existing.approvedBy,
+      approvedById: finalize ? userId : existing.approvedById,
       updatedAt: new Date(),
-    })
-    .where(eq(schema.documents.id, documentId));
+    },
+  });
 
   // Replace line items (positions may have shifted, items added/removed).
-  await db
-    .delete(schema.lineItems)
-    .where(eq(schema.lineItems.documentId, documentId));
+  await prisma.mrpLineItem.deleteMany({ where: { documentId } });
   if (extraction.lineItems.length > 0) {
-    await db.insert(schema.lineItems).values(
-      extraction.lineItems.map((li) => ({
+    await prisma.mrpLineItem.createMany({
+      data: extraction.lineItems.map((li) => ({
         documentId,
         position: li.position,
         name: li.name,
@@ -112,7 +115,7 @@ export async function saveExtraction(opts: {
         vatRate: li.vatRate ?? null,
         lineTotal: li.lineTotal ?? null,
       })),
-    );
+    });
   }
 
   if (finalize && supplierId) {

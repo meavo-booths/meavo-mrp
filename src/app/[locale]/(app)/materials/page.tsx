@@ -1,4 +1,3 @@
-import { asc, eq } from "drizzle-orm";
 import { setRequestLocale, getTranslations } from "next-intl/server";
 
 import { BomMissingMaterialsBanner } from "@/components/stock/bom-missing-banner";
@@ -12,7 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { db, schema } from "@/lib/db/client";
+import { prisma } from "@/lib/prisma";
 import { requireSessionUser } from "@/lib/auth/session";
 import { refreshBomMissingMaterialsForUi } from "@/lib/stock/bom-missing";
 import { ensureStockReferenceData } from "@/lib/stock";
@@ -31,14 +30,18 @@ export default async function MaterialsPage({
 
   const t = await getTranslations("stock.materials");
   const tc = await getTranslations("stock.csv");
-  const [materials, bomMissing] = await Promise.all([
-    db
-      .select()
-      .from(schema.materials)
-      .where(eq(schema.materials.isActive, true))
-      .orderBy(asc(schema.materials.code)),
+  const [materialRows, bomMissing] = await Promise.all([
+    prisma.mrpMaterial.findMany({
+      where: { isActive: true },
+      orderBy: { code: "asc" },
+    }),
     refreshBomMissingMaterialsForUi(),
   ]);
+  const materials = materialRows.map((m) => ({
+    ...m,
+    unitPriceEur: m.unitPriceEur?.toString() ?? null,
+    currentQuantity: m.currentQuantity.toString(),
+  }));
 
   const csvLabels = {
     title: tc("materialsTitle"),

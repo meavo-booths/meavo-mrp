@@ -1,7 +1,5 @@
 import "server-only";
 
-import { and, eq, inArray } from "drizzle-orm";
-
 import { parseCsv, rowsToObjects, serializeCsv } from "@/lib/import/csv";
 import { ensureBoothModelId } from "@/lib/import/resolve";
 import {
@@ -12,7 +10,7 @@ import {
   type BomLineInput,
 } from "@/lib/import/schemas";
 import { emptyImportResult, type ImportResult } from "@/lib/import/types";
-import { db, schema } from "@/lib/db/client";
+import { prisma } from "@/lib/prisma";
 import { listAllBomLinesForExport } from "@/lib/stock/bom-cost";
 import { syncBomMissingFromMaterialCodes } from "@/lib/stock/bom-missing";
 import { validateBomConflicts } from "@/lib/stock/bom-match";
@@ -41,7 +39,7 @@ export async function exportElementBomCsv(): Promise<string> {
         r.market ?? "",
         r.simpleName,
         r.materialCode ?? "",
-        r.quantity,
+        String(r.quantity),
         "",
         lineCost,
       ];
@@ -115,16 +113,13 @@ export async function importElementBomCsv(text: string): Promise<ImportResult> {
     }
 
     try {
-      await db.transaction(async (tx) => {
+      await prisma.$transaction(async (tx) => {
         const boothModelId = await ensureBoothModelId(boothModel);
 
-        const elements = await tx
-          .select({
-            id: schema.boothElements.id,
-            simpleName: schema.boothElements.simpleName,
-          })
-          .from(schema.boothElements)
-          .where(eq(schema.boothElements.boothModelId, boothModelId));
+        const elements = await tx.mrpBoothElement.findMany({
+          where: { boothModelId },
+          select: { id: true, simpleName: true },
+        });
 
         const elementBySimple = new Map(
           elements.map((e) => [e.simpleName, e.id]),
@@ -132,12 +127,12 @@ export async function importElementBomCsv(text: string): Promise<ImportResult> {
         const elementIds = elements.map((e) => e.id);
 
         if (elementIds.length > 0) {
-          await tx
-            .delete(schema.elementBomLines)
-            .where(inArray(schema.elementBomLines.boothElementId, elementIds));
+          await tx.mrpElementBomLine.deleteMany({
+            where: { boothElementId: { in: elementIds } },
+          });
         }
 
-        const materials = await tx.select().from(schema.materials);
+        const materials = await tx.mrpMaterial.findMany();
         const materialByCode = new Map(
           materials
             .filter((m) => m.code)
@@ -164,12 +159,14 @@ export async function importElementBomCsv(text: string): Promise<ImportResult> {
             );
           }
 
-          await tx.insert(schema.elementBomLines).values({
-            boothElementId,
-            materialId,
-            colour: line.colour,
-            market: line.market,
-            quantity: line.quantity,
+          await tx.mrpElementBomLine.create({
+            data: {
+              boothElementId,
+              materialId,
+              colour: line.colour,
+              market: line.market,
+              quantity: line.quantity,
+            },
           });
           inserted++;
         }

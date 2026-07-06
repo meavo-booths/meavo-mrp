@@ -6,15 +6,16 @@ const ServerEnvSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
 
   NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3000"),
-  NEXT_PUBLIC_SUPABASE_URL: z.string().url(),
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(20),
-  SUPABASE_SERVICE_ROLE_KEY: z.string().min(20).optional(),
 
   DATABASE_URL: z.string().min(10).optional(),
-  DIRECT_DATABASE_URL: z.string().min(10).optional(),
 
-  SUPABASE_BUCKET_ORIGINALS: z.string().default("originals"),
-  SUPABASE_BUCKET_THUMBNAILS: z.string().default("thumbnails"),
+  AUTH_SECRET: z.string().min(10).optional(),
+  AUTH_GOOGLE_ID: z.string().optional(),
+  AUTH_GOOGLE_SECRET: z.string().optional(),
+  MRP_TOOL_CARD_ID: z.string().default("seed-mrp-tool"),
+  GATEWAY_URL: z.string().url().default("https://meavo.app"),
+
+  BLOB_READ_WRITE_TOKEN: z.string().min(10).optional(),
 
   GEMINI_API_KEY: z.string().min(10).optional(),
   GEMINI_MODEL: z.string().default("gemini-2.5-flash"),
@@ -30,8 +31,17 @@ const ServerEnvSchema = z.object({
 
 export type ServerEnv = z.infer<typeof ServerEnvSchema>;
 
+/** Empty strings (e.g. unset Vercel placeholders) behave like missing vars. */
+function nonEmptyEnv(): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(process.env).filter(
+      (entry): entry is [string, string] => (entry[1] ?? "") !== "",
+    ),
+  );
+}
+
 function loadEnv(): ServerEnv {
-  const parsed = ServerEnvSchema.safeParse(process.env);
+  const parsed = ServerEnvSchema.safeParse(nonEmptyEnv());
   if (!parsed.success) {
     const issues = parsed.error.issues
       .map((i) => `  - ${i.path.join(".")}: ${i.message}`)
@@ -47,7 +57,8 @@ function loadEnv(): ServerEnv {
  * Lazily-validated server-side environment variables.
  *
  * The validation is intentionally permissive at construction time — many
- * variables are optional so that local builds work before Supabase is wired.
+ * variables are optional so that local builds work before the database and
+ * auth are wired.
  */
 export const env: ServerEnv = (() => {
   try {
@@ -63,14 +74,9 @@ export const env: ServerEnv = (() => {
       );
     }
     return ServerEnvSchema.parse({
-      NODE_ENV: process.env.NODE_ENV ?? "development",
+      NODE_ENV: process.env.NODE_ENV || "development",
       NEXT_PUBLIC_APP_URL:
-        process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
-      NEXT_PUBLIC_SUPABASE_URL:
-        process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://placeholder.supabase.co",
-      NEXT_PUBLIC_SUPABASE_ANON_KEY:
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
-        "placeholder_anon_key_at_least_twenty_characters_long",
+        process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
     });
   }
 })();

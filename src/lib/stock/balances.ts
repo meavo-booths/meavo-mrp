@@ -1,37 +1,25 @@
 import "server-only";
 
-import { asc, eq } from "drizzle-orm";
-
-import { db, schema } from "@/lib/db/client";
+import { prisma } from "@/lib/prisma";
 
 export async function listBalances(options: { warehouseId?: string } = {}) {
-  const rows = await db
-    .select({
-      balanceId: schema.stockBalances.id,
-      warehouseId: schema.stockBalances.warehouseId,
-      warehouseCode: schema.warehouses.code,
-      warehouseName: schema.warehouses.name,
-      materialId: schema.materials.id,
-      materialCode: schema.materials.code,
-      materialName: schema.materials.name,
-      unit: schema.materials.unit,
-      quantity: schema.stockBalances.quantity,
-    })
-    .from(schema.stockBalances)
-    .innerJoin(
-      schema.materials,
-      eq(schema.stockBalances.materialId, schema.materials.id),
-    )
-    .innerJoin(
-      schema.warehouses,
-      eq(schema.stockBalances.warehouseId, schema.warehouses.id),
-    )
-    .where(
-      options.warehouseId
-        ? eq(schema.stockBalances.warehouseId, options.warehouseId)
-        : undefined,
-    )
-    .orderBy(asc(schema.materials.name));
+  const rows = await prisma.mrpStockBalance.findMany({
+    where: options.warehouseId
+      ? { warehouseId: options.warehouseId }
+      : undefined,
+    include: { material: true, warehouse: true },
+    orderBy: { material: { name: "asc" } },
+  });
 
-  return rows;
+  return rows.map((row) => ({
+    balanceId: row.id,
+    warehouseId: row.warehouseId,
+    warehouseCode: row.warehouse.code,
+    warehouseName: row.warehouse.name,
+    materialId: row.material.id,
+    materialCode: row.material.code,
+    materialName: row.material.name,
+    unit: row.material.unit,
+    quantity: row.quantity.toString(),
+  }));
 }

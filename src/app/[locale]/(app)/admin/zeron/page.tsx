@@ -1,10 +1,9 @@
 import { setRequestLocale, getTranslations } from "next-intl/server";
 import { redirect } from "next/navigation";
-import { eq, desc } from "drizzle-orm";
 import { ExternalLink } from "lucide-react";
 
 import { Link } from "@/i18n/navigation";
-import { db, schema } from "@/lib/db/client";
+import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth/session";
 import { env } from "@/lib/env";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,34 +37,27 @@ export default async function ZeronAdminPage({
   const adapterKey = env.ZERON_ADAPTER;
 
   // Pull the most recent attempts (and their parent documents)
-  const attempts = await db
-    .select({
-      id: schema.syncAttempts.id,
-      documentId: schema.syncAttempts.documentId,
-      adapter: schema.syncAttempts.adapter,
-      status: schema.syncAttempts.status,
-      error: schema.syncAttempts.error,
-      response: schema.syncAttempts.response,
-      attemptedAt: schema.syncAttempts.attemptedAt,
-      completedAt: schema.syncAttempts.completedAt,
-      isCurrent: schema.syncAttempts.isCurrent,
-      docNumber: schema.documents.documentNumber,
-      docType: schema.documents.type,
-      docStatus: schema.documents.status,
-      docZone: schema.documents.deliveryZone,
-      supplierName: schema.suppliers.name,
-    })
-    .from(schema.syncAttempts)
-    .leftJoin(
-      schema.documents,
-      eq(schema.syncAttempts.documentId, schema.documents.id),
-    )
-    .leftJoin(
-      schema.suppliers,
-      eq(schema.documents.supplierId, schema.suppliers.id),
-    )
-    .orderBy(desc(schema.syncAttempts.attemptedAt))
-    .limit(100);
+  const attemptRows = await prisma.mrpSyncAttempt.findMany({
+    include: { document: { include: { supplier: true } } },
+    orderBy: { attemptedAt: "desc" },
+    take: 100,
+  });
+  const attempts = attemptRows.map((a) => ({
+    id: a.id,
+    documentId: a.documentId,
+    adapter: a.adapter,
+    status: a.status,
+    error: a.error,
+    response: a.response,
+    attemptedAt: a.attemptedAt,
+    completedAt: a.completedAt,
+    isCurrent: a.isCurrent,
+    docNumber: a.document.documentNumber,
+    docType: a.document.type,
+    docStatus: a.document.status,
+    docZone: a.document.deliveryZone,
+    supplierName: a.document.supplier?.name ?? null,
+  }));
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-8 space-y-6">

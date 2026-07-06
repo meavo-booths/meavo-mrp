@@ -1,8 +1,8 @@
 import "server-only";
 
-import { eq, or } from "drizzle-orm";
+import type { MrpSupplier } from "@prisma/client";
 
-import { db, schema } from "@/lib/db/client";
+import { prisma } from "@/lib/prisma";
 import {
   inferCountryFromVatNumber,
   inferDeliveryZoneFromCountryCode,
@@ -29,29 +29,37 @@ export type SupplierLookupInput = {
 export async function findOrCreateSupplier(input: SupplierLookupInput) {
   const normalized = normalizeName(input.name);
 
-  let existing = null as
-    | typeof schema.suppliers.$inferSelect
-    | null;
+  let existing = null as MrpSupplier | null;
 
   if (input.vatNumber) {
-    existing = (await db.query.suppliers.findFirst({
-      where: eq(schema.suppliers.vatNumber, input.vatNumber),
-    })) ?? null;
+    existing = await prisma.mrpSupplier.findFirst({
+      where: { vatNumber: input.vatNumber },
+    });
   }
   if (!existing && input.eik) {
-    existing = (await db.query.suppliers.findFirst({
-      where: eq(schema.suppliers.eik, input.eik),
-    })) ?? null;
+    existing = await prisma.mrpSupplier.findFirst({
+      where: { eik: input.eik },
+    });
   }
   if (!existing && normalized) {
-    existing = (await db.query.suppliers.findFirst({
-      where: eq(schema.suppliers.normalizedName, normalized),
-    })) ?? null;
+    existing = await prisma.mrpSupplier.findFirst({
+      where: { normalizedName: normalized },
+    });
   }
 
   if (existing) {
     // Backfill missing fields without overwriting good data.
-    const patch: Partial<typeof schema.suppliers.$inferInsert> = {};
+    const patch: Partial<
+      Pick<
+        MrpSupplier,
+        | "vatNumber"
+        | "eik"
+        | "countryCode"
+        | "address"
+        | "defaultCurrency"
+        | "deliveryZone"
+      >
+    > = {};
     if (!existing.vatNumber && input.vatNumber) patch.vatNumber = input.vatNumber;
     if (!existing.eik && input.eik) patch.eik = input.eik;
     if (!existing.countryCode && input.countryCode)
@@ -70,10 +78,10 @@ export async function findOrCreateSupplier(input: SupplierLookupInput) {
       if (zone) patch.deliveryZone = zone;
     }
     if (Object.keys(patch).length > 0) {
-      await db
-        .update(schema.suppliers)
-        .set({ ...patch, updatedAt: new Date() })
-        .where(eq(schema.suppliers.id, existing.id));
+      await prisma.mrpSupplier.update({
+        where: { id: existing.id },
+        data: { ...patch, updatedAt: new Date() },
+      });
       existing = { ...existing, ...patch } as typeof existing;
     }
     return existing;
@@ -83,9 +91,8 @@ export async function findOrCreateSupplier(input: SupplierLookupInput) {
     input.countryCode ?? inferCountryFromVatNumber(input.vatNumber);
   const zone = inferDeliveryZoneFromCountryCode(country);
 
-  const [created] = await db
-    .insert(schema.suppliers)
-    .values({
+  const created = await prisma.mrpSupplier.create({
+    data: {
       name: input.name ?? "(unknown supplier)",
       normalizedName: normalized || "(unknown supplier)",
       vatNumber: input.vatNumber,
@@ -94,8 +101,8 @@ export async function findOrCreateSupplier(input: SupplierLookupInput) {
       address: input.address,
       defaultCurrency: input.defaultCurrency,
       deliveryZone: zone,
-    })
-    .returning();
+    },
+  });
 
   return created;
 }
@@ -114,15 +121,14 @@ export async function searchSuppliersByVatOrName(query: string, limit = 10) {
   const q = query.trim();
   if (!q) return [];
   const norm = normalizeName(q);
-  return db
-    .select()
-    .from(schema.suppliers)
-    .where(
-      or(
-        eq(schema.suppliers.vatNumber, q),
-        eq(schema.suppliers.eik, q),
-        eq(schema.suppliers.normalizedName, norm),
-      ),
-    )
-    .limit(limit);
+  return prisma.mrpSupplier.findMany({
+    where: {
+      OR: [
+        { vatNumber: q },
+        { eik: q },
+        { normalizedName: norm },
+      ],
+    },
+    take: limit,
+  });
 }

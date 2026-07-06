@@ -1,12 +1,11 @@
 import { setRequestLocale, getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
-import { eq, desc } from "drizzle-orm";
 import { FileText } from "lucide-react";
 
 import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { db, schema } from "@/lib/db/client";
+import { prisma } from "@/lib/prisma";
 import { requireSessionUser } from "@/lib/auth/session";
 import { isInvoiceScannerEnabled } from "@/lib/features";
 import { StatusBadge } from "@/components/documents/status-badge";
@@ -28,27 +27,28 @@ export default async function DocumentsPage({
   const t = await getTranslations("documents");
   const tType = await getTranslations("scan.documentType");
 
-  const rows = await db
-    .select({
-      id: schema.documents.id,
-      type: schema.documents.type,
-      documentNumber: schema.documents.documentNumber,
-      issueDate: schema.documents.issueDate,
-      total: schema.documents.total,
-      currency: schema.documents.currency,
-      status: schema.documents.status,
-      deliveryZone: schema.documents.deliveryZone,
-      supplierNameRaw: schema.documents.supplierNameRaw,
-      supplierName: schema.suppliers.name,
-    })
-    .from(schema.documents)
-    .leftJoin(
-      schema.suppliers,
-      eq(schema.documents.supplierId, schema.suppliers.id),
-    )
-    .where(eq(schema.documents.createdBy, user.id))
-    .orderBy(desc(schema.documents.createdAt))
-    .limit(200);
+  const docs = await prisma.mrpDocument.findMany({
+    where: { createdById: user.id },
+    select: {
+      id: true,
+      type: true,
+      documentNumber: true,
+      issueDate: true,
+      total: true,
+      currency: true,
+      status: true,
+      deliveryZone: true,
+      supplierNameRaw: true,
+      supplier: { select: { name: true } },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 200,
+  });
+  const rows = docs.map((d) => ({
+    ...d,
+    total: d.total?.toString() ?? null,
+    supplierName: d.supplier?.name ?? null,
+  }));
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-8">

@@ -1,13 +1,11 @@
 import "server-only";
 
-import { and, asc, eq } from "drizzle-orm";
-
 import { BOOTH_ELEMENTS_TEMPLATE } from "@/lib/import/booth-elements-config";
 import { parseCsv, rowsToObjects, serializeCsv } from "@/lib/import/csv";
 import { ensureBoothModelId } from "@/lib/import/resolve";
 import { ELEMENTS_COLUMNS, parseBoolean } from "@/lib/import/schemas";
 import { emptyImportResult, type ImportResult } from "@/lib/import/types";
-import { db, schema } from "@/lib/db/client";
+import { prisma } from "@/lib/prisma";
 
 export function elementsTemplateCsv(): string {
   const rows = BOOTH_ELEMENTS_TEMPLATE.map((e) => [
@@ -21,25 +19,15 @@ export function elementsTemplateCsv(): string {
 }
 
 export async function exportElementsCsv(): Promise<string> {
-  const rows = await db
-    .select({
-      boothModel: schema.boothModels.name,
-      sheetHeader: schema.boothElements.sheetHeader,
-      simpleName: schema.boothElements.simpleName,
-      sortOrder: schema.boothElements.sortOrder,
-      isActive: schema.boothElements.isActive,
-    })
-    .from(schema.boothElements)
-    .innerJoin(
-      schema.boothModels,
-      eq(schema.boothElements.boothModelId, schema.boothModels.id),
-    )
-    .orderBy(asc(schema.boothModels.name), asc(schema.boothElements.sortOrder));
+  const rows = await prisma.mrpBoothElement.findMany({
+    include: { boothModel: { select: { name: true } } },
+    orderBy: [{ boothModel: { name: "asc" } }, { sortOrder: "asc" }],
+  });
 
   return serializeCsv(
     [...ELEMENTS_COLUMNS],
     rows.map((r) => [
-      r.boothModel,
+      r.boothModel.name,
       r.sheetHeader,
       r.simpleName,
       String(r.sortOrder),
@@ -78,44 +66,44 @@ export async function importElementsCsv(text: string): Promise<ImportResult> {
       const isActive = parseBoolean(raw.active ?? "", true);
       const boothModelId = await ensureBoothModelId(boothModel);
 
-      const byHeader = await db.query.boothElements.findFirst({
-        where: and(
-          eq(schema.boothElements.boothModelId, boothModelId),
-          eq(schema.boothElements.sheetHeader, sheetHeader),
-        ),
+      const byHeader = await prisma.mrpBoothElement.findUnique({
+        where: {
+          boothModelId_sheetHeader: { boothModelId, sheetHeader },
+        },
       });
 
       if (byHeader) {
-        await db
-          .update(schema.boothElements)
-          .set({ simpleName, sortOrder, isActive })
-          .where(eq(schema.boothElements.id, byHeader.id));
+        await prisma.mrpBoothElement.update({
+          where: { id: byHeader.id },
+          data: { simpleName, sortOrder, isActive },
+        });
         result.updated++;
         continue;
       }
 
-      const bySimple = await db.query.boothElements.findFirst({
-        where: and(
-          eq(schema.boothElements.boothModelId, boothModelId),
-          eq(schema.boothElements.simpleName, simpleName),
-        ),
+      const bySimple = await prisma.mrpBoothElement.findUnique({
+        where: {
+          boothModelId_simpleName: { boothModelId, simpleName },
+        },
       });
 
       if (bySimple) {
-        await db
-          .update(schema.boothElements)
-          .set({ sheetHeader, sortOrder, isActive })
-          .where(eq(schema.boothElements.id, bySimple.id));
+        await prisma.mrpBoothElement.update({
+          where: { id: bySimple.id },
+          data: { sheetHeader, sortOrder, isActive },
+        });
         result.updated++;
         continue;
       }
 
-      await db.insert(schema.boothElements).values({
-        boothModelId,
-        sheetHeader,
-        simpleName,
-        sortOrder,
-        isActive,
+      await prisma.mrpBoothElement.create({
+        data: {
+          boothModelId,
+          sheetHeader,
+          simpleName,
+          sortOrder,
+          isActive,
+        },
       });
       result.created++;
     } catch (err) {

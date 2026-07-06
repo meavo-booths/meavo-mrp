@@ -1,8 +1,6 @@
 import "server-only";
 
-import { asc, eq } from "drizzle-orm";
-
-import { db, schema } from "@/lib/db/client";
+import { prisma } from "@/lib/prisma";
 import {
   deriveBoothMarket,
   resolveBomLines,
@@ -36,23 +34,21 @@ export async function computeElementBomCostForMarket(input: {
   boothColour: string | null;
   boothMarket: "default" | "US";
 }): Promise<{ lines: BomLineWithCost[]; totalCostEur: number | null }> {
-  const rows = await db
-    .select({
-      colour: schema.elementBomLines.colour,
-      market: schema.elementBomLines.market,
-      quantity: schema.elementBomLines.quantity,
-      materialId: schema.materials.id,
-      materialCode: schema.materials.code,
-      materialName: schema.materials.name,
-      unitPriceEur: schema.materials.unitPriceEur,
-    })
-    .from(schema.elementBomLines)
-    .innerJoin(
-      schema.materials,
-      eq(schema.elementBomLines.materialId, schema.materials.id),
-    )
-    .where(eq(schema.elementBomLines.boothElementId, input.boothElementId))
-    .orderBy(asc(schema.materials.code));
+  const bomLines = await prisma.mrpElementBomLine.findMany({
+    where: { boothElementId: input.boothElementId },
+    include: { material: true },
+    orderBy: { material: { code: "asc" } },
+  });
+
+  const rows = bomLines.map((l) => ({
+    colour: l.colour,
+    market: l.market,
+    quantity: l.quantity.toString(),
+    materialId: l.material.id,
+    materialCode: l.material.code,
+    materialName: l.material.name,
+    unitPriceEur: l.material.unitPriceEur?.toString() ?? null,
+  }));
 
   const resolvedInput: ResolvedBomLine[] = rows.map((r) => ({
     materialCode: r.materialCode ?? r.materialId,
@@ -101,35 +97,28 @@ export async function computeElementBomCostForMarket(input: {
 }
 
 export async function listAllBomLinesForExport() {
-  return db
-    .select({
-      boothModel: schema.boothModels.name,
-      simpleName: schema.boothElements.simpleName,
-      colour: schema.elementBomLines.colour,
-      market: schema.elementBomLines.market,
-      materialCode: schema.materials.code,
-      materialName: schema.materials.name,
-      quantity: schema.elementBomLines.quantity,
-      unitPriceEur: schema.materials.unitPriceEur,
-    })
-    .from(schema.elementBomLines)
-    .innerJoin(
-      schema.boothElements,
-      eq(schema.elementBomLines.boothElementId, schema.boothElements.id),
-    )
-    .innerJoin(
-      schema.boothModels,
-      eq(schema.boothElements.boothModelId, schema.boothModels.id),
-    )
-    .innerJoin(
-      schema.materials,
-      eq(schema.elementBomLines.materialId, schema.materials.id),
-    )
-    .orderBy(
-      asc(schema.boothModels.name),
-      asc(schema.boothElements.sortOrder),
-      asc(schema.elementBomLines.colour),
-      asc(schema.elementBomLines.market),
-      asc(schema.materials.code),
-    );
+  const rows = await prisma.mrpElementBomLine.findMany({
+    include: {
+      material: true,
+      boothElement: { include: { boothModel: true } },
+    },
+    orderBy: [
+      { boothElement: { boothModel: { name: "asc" } } },
+      { boothElement: { sortOrder: "asc" } },
+      { colour: "asc" },
+      { market: "asc" },
+      { material: { code: "asc" } },
+    ],
+  });
+
+  return rows.map((r) => ({
+    boothModel: r.boothElement.boothModel.name,
+    simpleName: r.boothElement.simpleName,
+    colour: r.colour,
+    market: r.market,
+    materialCode: r.material.code,
+    materialName: r.material.name,
+    quantity: r.quantity.toString(),
+    unitPriceEur: r.material.unitPriceEur?.toString() ?? null,
+  }));
 }

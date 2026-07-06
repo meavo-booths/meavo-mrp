@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 
 import { invoiceScannerDisabledResponse, requireApiUser } from "@/lib/api/guard";
-import { db, schema } from "@/lib/db/client";
+import { prisma } from "@/lib/prisma";
 import { buildOriginalPath, uploadOriginal } from "@/lib/storage/buckets";
 import { sha256Hex } from "@/lib/utils/hash";
 import { sanitizeFilename } from "@/lib/utils/sanitize-filename";
@@ -25,6 +24,17 @@ const ALLOWED_MIME = new Set([
 ]);
 
 const MAX_BYTES = 25 * 1024 * 1024;
+
+/** BigInt columns cannot be JSON.stringify-ed — convert before returning. */
+function serializeDocument<T extends { originalSizeBytes: bigint | null }>(
+  doc: T,
+) {
+  return {
+    ...doc,
+    originalSizeBytes:
+      doc.originalSizeBytes === null ? null : Number(doc.originalSizeBytes),
+  };
+}
 
 /** POST /api/documents — multipart/form-data: file=<File>, typeHint=<...>. */
 export async function POST(request: Request) {
@@ -59,9 +69,8 @@ export async function POST(request: Request) {
 
   // Dedupe: if a document with same hash from same user already exists,
   // return its ID instead of creating a new one.
-  const existing = await db.query.documents.findFirst({
-    where: (d, { and, eq: e }) =>
-      and(e(d.contentHash, contentHash), e(d.createdBy, user.id)),
+  const existing = await prisma.mrpDocument.findFirst({
+    where: { contentHash, createdById: user.id },
   });
   if (existing) {
     return NextResponse.json({ id: existing.id, deduped: true });
@@ -90,15 +99,17 @@ export async function POST(request: Request) {
   const initialType = typeHint === "auto" ? "invoice" : typeHint;
 
   try {
-    await db.insert(schema.documents).values({
-      id: documentId,
-      type: initialType,
-      status: "pending_review",
-      originalFilePath: path,
-      originalMimeType: file.type,
-      originalSizeBytes: file.size,
-      contentHash,
-      createdBy: user.id,
+    await prisma.mrpDocument.create({
+      data: {
+        id: documentId,
+        type: initialType,
+        status: "pending_review",
+        storageKey: path,
+        originalMimeType: file.type,
+        originalSizeBytes: BigInt(file.size),
+        contentHash,
+        createdById: user.id,
+      },
     });
   } catch (e) {
     const msg = (e as Error).message;
@@ -119,11 +130,11 @@ export async function GET() {
   const { user, error } = await requireApiUser();
   if (error) return error;
 
-  const rows = await db.query.documents.findMany({
-    where: eq(schema.documents.createdBy, user.id),
-    orderBy: (d, { desc }) => [desc(d.createdAt)],
-    limit: 200,
+  const rows = await prisma.mrpDocument.findMany({
+    where: { createdById: user.id },
+    orderBy: { createdAt: "desc" },
+    take: 200,
   });
 
-  return NextResponse.json({ documents: rows });
+  return NextResponse.json({ documents: rows.map(serializeDocument) });
 }

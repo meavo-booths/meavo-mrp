@@ -69,12 +69,14 @@ bought the domain — Cloudflare, Namecheap, GoDaddy, .BG registrar, etc.):
    | Variable | Value |
    | --- | --- |
    | `NEXT_PUBLIC_APP_URL` | `https://stock.yourcompany.bg` |
+   | `AUTH_URL` | `https://stock.yourcompany.bg` |
 
 2. Re-deploy.
 3. In Google Cloud (and Microsoft Entra if used), add
-   `https://stock.yourcompany.bg` to **Authorized JavaScript origins**.
-   The Supabase callback URL stays the same — it is `*.supabase.co`,
-   not your domain.
+   `https://stock.yourcompany.bg` to **Authorized JavaScript origins**
+   and `https://stock.yourcompany.bg/api/auth/callback/google` to
+   **Authorized redirect URIs** (NextAuth handles the OAuth callback on
+   your own domain).
 
 ---
 

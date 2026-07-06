@@ -2,34 +2,46 @@ import "server-only";
 
 import { redirect } from "next/navigation";
 
-import { getServerSupabase } from "./supabase-server";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+
+export type MrpRole = "scanner" | "reviewer" | "admin";
 
 export type SessionUser = {
   id: string;
   email: string;
   fullName: string | null;
   avatarUrl: string | null;
+  role: MrpRole;
 };
 
 /**
- * Returns the current Supabase session user, or null if not signed in.
+ * Returns the current NextAuth session user (gateway `User.id`) with the MRP
+ * role from `MrpUserProfile`, or null if not signed in.
  * Use in Server Components / Route Handlers.
  */
 export async function getSessionUser(): Promise<SessionUser | null> {
-  const supabase = await getServerSupabase();
-  const { data, error } = await supabase.auth.getUser();
-  if (error || !data.user || !data.user.email) return null;
+  const session = await auth();
+  const id = session?.user?.id;
+  if (!id) return null;
+
+  const user = await prisma.user.findUnique({
+    where: { id },
+    select: {
+      email: true,
+      name: true,
+      image: true,
+      mrpProfile: { select: { role: true } },
+    },
+  });
+  if (!user) return null;
+
   return {
-    id: data.user.id,
-    email: data.user.email,
-    fullName:
-      (data.user.user_metadata?.full_name as string | undefined) ??
-      (data.user.user_metadata?.name as string | undefined) ??
-      null,
-    avatarUrl:
-      (data.user.user_metadata?.avatar_url as string | undefined) ??
-      (data.user.user_metadata?.picture as string | undefined) ??
-      null,
+    id,
+    email: user.email,
+    fullName: user.name,
+    avatarUrl: user.image,
+    role: user.mrpProfile?.role ?? "scanner",
   };
 }
 

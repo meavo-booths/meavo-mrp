@@ -1,8 +1,6 @@
 import "server-only";
 
-import { eq } from "drizzle-orm";
-
-import { db, schema } from "@/lib/db/client";
+import { prisma } from "@/lib/prisma";
 
 /** Map sheet abbreviations and names to warehouse codes in DB. */
 const WAREHOUSE_ALIASES: Record<string, string> = {
@@ -24,8 +22,8 @@ export async function resolveWarehouseId(raw: string): Promise<string | null> {
   const code = WAREHOUSE_ALIASES[key];
   if (!code) return null;
 
-  const wh = await db.query.warehouses.findFirst({
-    where: eq(schema.warehouses.code, code),
+  const wh = await prisma.mrpWarehouse.findUnique({
+    where: { code },
   });
   return wh?.id ?? null;
 }
@@ -35,14 +33,13 @@ export function warehouseCodeFromAlias(raw: string): string | null {
 }
 
 export async function ensureBoothModelId(name: string): Promise<string> {
-  const existing = await db.query.boothModels.findFirst({
-    where: eq(schema.boothModels.name, name),
+  const existing = await prisma.mrpBoothModel.findUnique({
+    where: { name },
   });
   if (existing) return existing.id;
 
-  const [created] = await db
-    .insert(schema.boothModels)
-    .values({ name })
-    .returning({ id: schema.boothModels.id });
-  return created!.id;
+  const created = await prisma.mrpBoothModel.create({
+    data: { name },
+  });
+  return created.id;
 }

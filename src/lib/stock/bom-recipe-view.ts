@@ -1,8 +1,6 @@
 import "server-only";
 
-import { asc, eq, sql } from "drizzle-orm";
-
-import { db, schema } from "@/lib/db/client";
+import { prisma } from "@/lib/prisma";
 import type { BoothMarket } from "@/lib/import/schemas";
 
 export type BoothModelSummary = {
@@ -72,58 +70,52 @@ function formatQty(n: number): string {
 }
 
 async function loadBomRowsForModel(modelName: string): Promise<RawBomRow[]> {
-  return db
-    .select({
-      simpleName: schema.boothElements.simpleName,
-      sortOrder: schema.boothElements.sortOrder,
-      colour: schema.elementBomLines.colour,
-      market: schema.elementBomLines.market,
-      materialCode: schema.materials.code,
-      materialName: schema.materials.name,
-      quantity: schema.elementBomLines.quantity,
-      unitPriceEur: schema.materials.unitPriceEur,
-    })
-    .from(schema.elementBomLines)
-    .innerJoin(
-      schema.boothElements,
-      eq(schema.elementBomLines.boothElementId, schema.boothElements.id),
-    )
-    .innerJoin(
-      schema.boothModels,
-      eq(schema.boothElements.boothModelId, schema.boothModels.id),
-    )
-    .innerJoin(
-      schema.materials,
-      eq(schema.elementBomLines.materialId, schema.materials.id),
-    )
-    .where(eq(schema.boothModels.name, modelName))
-    .orderBy(
-      asc(schema.boothElements.sortOrder),
-      asc(schema.materials.code),
-      asc(schema.elementBomLines.colour),
-      asc(schema.elementBomLines.market),
-    );
+  const rows = await prisma.mrpElementBomLine.findMany({
+    where: { boothElement: { boothModel: { name: modelName } } },
+    include: {
+      boothElement: true,
+      material: true,
+    },
+    orderBy: [
+      { boothElement: { sortOrder: "asc" } },
+      { material: { code: "asc" } },
+      { colour: "asc" },
+      { market: "asc" },
+    ],
+  });
+
+  return rows.map((r) => ({
+    simpleName: r.boothElement.simpleName,
+    sortOrder: r.boothElement.sortOrder,
+    colour: r.colour,
+    market: r.market,
+    materialCode: r.material.code,
+    materialName: r.material.name,
+    quantity: r.quantity.toString(),
+    unitPriceEur: r.material.unitPriceEur?.toString() ?? null,
+  }));
 }
 
 export async function listBoothModelsWithRecipes(): Promise<BoothModelSummary[]> {
-  const rows = await db
-    .select({
-      name: schema.boothModels.name,
-      panelCount: sql<number>`count(distinct ${schema.boothElements.id})::int`,
-      bomLineCount: sql<number>`count(${schema.elementBomLines.id})::int`,
-    })
-    .from(schema.boothModels)
-    .leftJoin(
-      schema.boothElements,
-      eq(schema.boothElements.boothModelId, schema.boothModels.id),
-    )
-    .leftJoin(
-      schema.elementBomLines,
-      eq(schema.elementBomLines.boothElementId, schema.boothElements.id),
-    )
-    .where(eq(schema.boothModels.isActive, true))
-    .groupBy(schema.boothModels.name)
-    .orderBy(asc(schema.boothModels.name));
+  const models = await prisma.mrpBoothModel.findMany({
+    where: { isActive: true },
+    orderBy: { name: "asc" },
+    select: {
+      name: true,
+      elements: {
+        select: {
+          id: true,
+          _count: { select: { bomLines: true } },
+        },
+      },
+    },
+  });
+
+  const rows: BoothModelSummary[] = models.map((m) => ({
+    name: m.name,
+    panelCount: m.elements.length,
+    bomLineCount: m.elements.reduce((sum, e) => sum + e._count.bomLines, 0),
+  }));
 
   return rows.filter((r) => r.bomLineCount > 0);
 }

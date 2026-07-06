@@ -1,4 +1,3 @@
-import { asc, desc, eq } from "drizzle-orm";
 import { setRequestLocale, getTranslations } from "next-intl/server";
 
 import { CsvDataPanel } from "@/components/stock/csv-data-panel";
@@ -10,7 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { db, schema } from "@/lib/db/client";
+import { prisma } from "@/lib/prisma";
 import { requireSessionUser } from "@/lib/auth/session";
 import { ensureStockReferenceData, getDefaultWarehouseId } from "@/lib/stock";
 import { listManufacturingBatchOptions } from "@/lib/stock/inventory-batch";
@@ -32,45 +31,42 @@ export default async function InventoryPage({
   const tc = await getTranslations("stock.csv");
   const defaultWarehouseId = await getDefaultWarehouseId();
 
-  const [materials, warehouses, batches, recentCounts] = await Promise.all([
-    db
-      .select({
-        id: schema.materials.id,
-        name: schema.materials.name,
-        code: schema.materials.code,
-      })
-      .from(schema.materials)
-      .where(eq(schema.materials.isActive, true))
-      .orderBy(asc(schema.materials.name)),
-    db
-      .select({ id: schema.warehouses.id, name: schema.warehouses.name })
-      .from(schema.warehouses)
-      .where(eq(schema.warehouses.isActive, true))
-      .orderBy(asc(schema.warehouses.name)),
+  const [materials, warehouses, batches, recentCountRows] = await Promise.all([
+    prisma.mrpMaterial.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true, code: true },
+      orderBy: { name: "asc" },
+    }),
+    prisma.mrpWarehouse.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
     listManufacturingBatchOptions(),
-    db
-      .select({
-        countDate: schema.inventoryCounts.countDate,
-        systemQuantity: schema.inventoryCounts.systemQuantity,
-        countedQuantity: schema.inventoryCounts.countedQuantity,
-        variance: schema.inventoryCounts.variance,
-        countedThroughBatchLabel: schema.inventoryCounts.countedThroughBatchLabel,
-        materialName: schema.materials.name,
-        unit: schema.materials.unit,
-        warehouseName: schema.warehouses.name,
-      })
-      .from(schema.inventoryCounts)
-      .innerJoin(
-        schema.materials,
-        eq(schema.inventoryCounts.materialId, schema.materials.id),
-      )
-      .innerJoin(
-        schema.warehouses,
-        eq(schema.inventoryCounts.warehouseId, schema.warehouses.id),
-      )
-      .orderBy(desc(schema.inventoryCounts.countDate))
-      .limit(20),
+    prisma.mrpInventoryCount.findMany({
+      select: {
+        countDate: true,
+        systemQuantity: true,
+        countedQuantity: true,
+        variance: true,
+        countedThroughBatchLabel: true,
+        material: { select: { name: true, unit: true } },
+        warehouse: { select: { name: true } },
+      },
+      orderBy: { countDate: "desc" },
+      take: 20,
+    }),
   ]);
+  const recentCounts = recentCountRows.map((row) => ({
+    countDate: row.countDate,
+    systemQuantity: row.systemQuantity.toString(),
+    countedQuantity: row.countedQuantity.toString(),
+    variance: row.variance.toString(),
+    countedThroughBatchLabel: row.countedThroughBatchLabel,
+    materialName: row.material.name,
+    unit: row.material.unit,
+    warehouseName: row.warehouse.name,
+  }));
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-8">

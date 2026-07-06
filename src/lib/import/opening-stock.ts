@@ -1,7 +1,5 @@
 import "server-only";
 
-import { asc, eq } from "drizzle-orm";
-
 import { parseCsv, rowsToObjects, serializeCsv } from "@/lib/import/csv";
 import { resolveWarehouseId, warehouseCodeFromAlias } from "@/lib/import/resolve";
 import {
@@ -10,7 +8,7 @@ import {
   parseOptionalQuantity,
 } from "@/lib/import/schemas";
 import { emptyImportResult, type ImportResult } from "@/lib/import/types";
-import { db, schema } from "@/lib/db/client";
+import { prisma } from "@/lib/prisma";
 import { recordInventoryCount } from "@/lib/stock/inventory";
 
 export function openingStockTemplateCsv(): string {
@@ -22,23 +20,16 @@ export function openingStockTemplateCsv(): string {
 }
 
 export async function exportOpeningStockCsv(): Promise<string> {
-  const rows = await db
-    .select({
-      code: schema.materials.code,
-      warehouseCode: schema.warehouses.code,
-      quantity: schema.stockBalances.quantity,
-      updatedAt: schema.stockBalances.updatedAt,
-    })
-    .from(schema.stockBalances)
-    .innerJoin(
-      schema.materials,
-      eq(schema.stockBalances.materialId, schema.materials.id),
-    )
-    .innerJoin(
-      schema.warehouses,
-      eq(schema.stockBalances.warehouseId, schema.warehouses.id),
-    )
-    .orderBy(asc(schema.materials.code), asc(schema.warehouses.code));
+  const rows = await prisma.mrpStockBalance.findMany({
+    include: {
+      material: { select: { code: true } },
+      warehouse: { select: { code: true } },
+    },
+    orderBy: [
+      { material: { code: "asc" } },
+      { warehouse: { code: "asc" } },
+    ],
+  });
 
   const aliasForCode: Record<string, string> = {
     aksakovo: "AKS",
@@ -50,9 +41,9 @@ export async function exportOpeningStockCsv(): Promise<string> {
   return serializeCsv(
     [...OPENING_STOCK_COLUMNS],
     rows.map((r) => [
-      r.code ?? "",
-      aliasForCode[r.warehouseCode] ?? r.warehouseCode,
-      r.quantity,
+      r.material.code ?? "",
+      aliasForCode[r.warehouse.code] ?? r.warehouse.code,
+      r.quantity.toString(),
       r.updatedAt.toISOString().slice(0, 10),
       "",
       "",
@@ -97,8 +88,8 @@ export async function importOpeningStockCsv(
     }
 
     try {
-      const material = await db.query.materials.findFirst({
-        where: eq(schema.materials.code, materialCode),
+      const material = await prisma.mrpMaterial.findUnique({
+        where: { code: materialCode },
       });
       if (!material) {
         result.ok = false;

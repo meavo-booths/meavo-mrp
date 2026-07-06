@@ -2,9 +2,9 @@
 
 import * as React from "react";
 import { Loader2 } from "lucide-react";
+import { signIn } from "next-auth/react";
 
 import { Button } from "@/components/ui/button";
-import { getBrowserSupabase } from "@/lib/auth/supabase-browser";
 
 export function LoginForm({
   googleLabel,
@@ -23,19 +23,7 @@ export function LoginForm({
 
   const onGoogle = async () => {
     setPending(true);
-    const supabase = getBrowserSupabase();
-    const callback = new URL("/auth/callback", window.location.origin);
-    callback.searchParams.set("next", next);
-    const { error: err } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: callback.toString(),
-      },
-    });
-    if (err) {
-      setPending(false);
-      window.location.search = `?error=${encodeURIComponent(err.message)}`;
-    }
+    await signIn("google", { callbackUrl: next });
   };
 
   return (

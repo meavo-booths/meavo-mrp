@@ -1,11 +1,9 @@
 import { setRequestLocale, getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
-import { eq } from "drizzle-orm";
 
-import { db, schema } from "@/lib/db/client";
+import { prisma } from "@/lib/prisma";
 import { requireSessionUser } from "@/lib/auth/session";
 import { isInvoiceScannerEnabled } from "@/lib/features";
-import { getOriginalSignedUrl } from "@/lib/storage/buckets";
 import { buildDefaultsFromDocument } from "@/lib/extractor/from-document";
 import type { ConfidenceMap } from "@/lib/extractor/schema";
 import { ReviewForm } from "@/components/documents/review-form";
@@ -25,23 +23,18 @@ export default async function DocumentPage({
   if (!isInvoiceScannerEnabled()) notFound();
   const user = await requireSessionUser();
 
-  const doc = await db.query.documents.findFirst({
-    where: eq(schema.documents.id, id),
+  const doc = await prisma.mrpDocument.findFirst({
+    where: { id },
   });
   if (!doc) notFound();
-  if (doc.createdBy !== user.id) notFound();
+  if (doc.createdById !== user.id) notFound();
 
-  const items = await db.query.lineItems.findMany({
-    where: eq(schema.lineItems.documentId, id),
-    orderBy: (li, { asc }) => [asc(li.position)],
+  const items = await prisma.mrpLineItem.findMany({
+    where: { documentId: id },
+    orderBy: { position: "asc" },
   });
 
-  let signedUrl: string | null = null;
-  try {
-    signedUrl = await getOriginalSignedUrl(doc.originalFilePath, 60 * 60);
-  } catch {
-    signedUrl = null;
-  }
+  const signedUrl: string | null = `/api/documents/${doc.id}/file`;
 
   const defaults = buildDefaultsFromDocument(doc, items);
   const confidence = (doc.confidence as ConfidenceMap | null) ?? {};

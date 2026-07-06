@@ -1,14 +1,12 @@
 import "server-only";
 
-import { asc, eq } from "drizzle-orm";
-
 import { parseCsv, rowsToObjects, serializeCsv } from "@/lib/import/csv";
 import {
   MATERIALS_COLUMNS,
   parseOptionalPrice,
 } from "@/lib/import/schemas";
 import { emptyImportResult, type ImportResult } from "@/lib/import/types";
-import { db, schema } from "@/lib/db/client";
+import { prisma } from "@/lib/prisma";
 import { clearBomMissingMaterialCodes } from "@/lib/stock/bom-missing";
 
 export function materialsTemplateCsv(): string {
@@ -19,11 +17,10 @@ export function materialsTemplateCsv(): string {
 }
 
 export async function exportMaterialsCsv(): Promise<string> {
-  const rows = await db
-    .select()
-    .from(schema.materials)
-    .where(eq(schema.materials.isActive, true))
-    .orderBy(asc(schema.materials.code));
+  const rows = await prisma.mrpMaterial.findMany({
+    where: { isActive: true },
+    orderBy: { code: "asc" },
+  });
 
   return serializeCsv(
     [...MATERIALS_COLUMNS],
@@ -31,7 +28,7 @@ export async function exportMaterialsCsv(): Promise<string> {
       m.code ?? "",
       m.name,
       m.unit,
-      m.unitPriceEur ?? "",
+      m.unitPriceEur?.toString() ?? "",
     ]),
   );
 }
@@ -56,28 +53,30 @@ export async function importMaterialsCsv(
       const unit = raw.unit?.trim() || "бр";
       const unitPriceEur = parseOptionalPrice(raw.unit_price_eur ?? "");
 
-      const existing = await db.query.materials.findFirst({
-        where: eq(schema.materials.code, code),
+      const existing = await prisma.mrpMaterial.findUnique({
+        where: { code },
       });
 
       if (existing) {
-        await db
-          .update(schema.materials)
-          .set({
+        await prisma.mrpMaterial.update({
+          where: { id: existing.id },
+          data: {
             name: raw.name?.trim() ? name : existing.name,
             unit: raw.unit?.trim() ? unit : existing.unit,
             unitPriceEur:
               raw.unit_price_eur?.trim() ? unitPriceEur : existing.unitPriceEur,
             updatedAt: new Date(),
-          })
-          .where(eq(schema.materials.id, existing.id));
+          },
+        });
         result.updated++;
       } else {
-        await db.insert(schema.materials).values({
-          code,
-          name,
-          unit,
-          unitPriceEur,
+        await prisma.mrpMaterial.create({
+          data: {
+            code,
+            name,
+            unit,
+            unitPriceEur,
+          },
         });
         result.created++;
       }

@@ -1,9 +1,9 @@
 import "server-only";
 
-import { eq } from "drizzle-orm";
+import { Prisma } from "@prisma/client";
 
-import { db, schema } from "@/lib/db/client";
 import type { SupplierProfileHints } from "@/lib/extractor/types";
+import { prisma } from "@/lib/prisma";
 
 const RECENT_EXAMPLES_CAP = 5;
 const HINT_THRESHOLD = 3; // a recurring correction must occur this many times to become a hint
@@ -15,13 +15,13 @@ const HINT_THRESHOLD = 3; // a recurring correction must occur this many times t
 export async function loadSupplierProfileHints(
   supplierId: string,
 ): Promise<SupplierProfileHints | undefined> {
-  const supplier = await db.query.suppliers.findFirst({
-    where: eq(schema.suppliers.id, supplierId),
+  const supplier = await prisma.mrpSupplier.findUnique({
+    where: { id: supplierId },
   });
   if (!supplier) return undefined;
 
-  const profile = await db.query.supplierExtractionProfiles.findFirst({
-    where: eq(schema.supplierExtractionProfiles.supplierId, supplierId),
+  const profile = await prisma.mrpSupplierExtractionProfile.findUnique({
+    where: { supplierId },
   });
 
   return {
@@ -44,8 +44,8 @@ export async function recordApprovedExtraction(opts: {
 }) {
   const { supplierId, finalExtraction } = opts;
 
-  const existing = await db.query.supplierExtractionProfiles.findFirst({
-    where: eq(schema.supplierExtractionProfiles.supplierId, supplierId),
+  const existing = await prisma.mrpSupplierExtractionProfile.findUnique({
+    where: { supplierId },
   });
 
   const prevExamples = ((existing?.recentExamples as unknown[]) ?? []) as Record<
@@ -56,9 +56,9 @@ export async function recordApprovedExtraction(opts: {
     -RECENT_EXAMPLES_CAP,
   );
 
-  const correctionRows = await db.query.correctionLogs.findMany({
-    where: eq(schema.correctionLogs.supplierId, supplierId),
-    limit: 500,
+  const correctionRows = await prisma.mrpCorrectionLog.findMany({
+    where: { supplierId },
+    take: 500,
   });
 
   const hints = mineHintsFromCorrections(
@@ -67,19 +67,21 @@ export async function recordApprovedExtraction(opts: {
   );
 
   if (existing) {
-    await db
-      .update(schema.supplierExtractionProfiles)
-      .set({
-        recentExamples: nextExamples,
-        hints,
+    await prisma.mrpSupplierExtractionProfile.update({
+      where: { supplierId },
+      data: {
+        recentExamples: nextExamples as Prisma.InputJsonValue,
+        hints: hints as Prisma.InputJsonValue,
         updatedAt: new Date(),
-      })
-      .where(eq(schema.supplierExtractionProfiles.supplierId, supplierId));
+      },
+    });
   } else {
-    await db.insert(schema.supplierExtractionProfiles).values({
-      supplierId,
-      recentExamples: nextExamples,
-      hints,
+    await prisma.mrpSupplierExtractionProfile.create({
+      data: {
+        supplierId,
+        recentExamples: nextExamples as Prisma.InputJsonValue,
+        hints: hints as Prisma.InputJsonValue,
+      },
     });
   }
 }

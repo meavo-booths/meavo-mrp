@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
 
 import { invoiceScannerDisabledResponse, requireApiUser } from "@/lib/api/guard";
-import { db, schema } from "@/lib/db/client";
+import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
 
@@ -17,18 +16,18 @@ export async function POST(
   if (error) return error;
   const { id } = await params;
 
-  const existing = await db.query.documents.findFirst({
-    where: eq(schema.documents.id, id),
+  const existing = await prisma.mrpDocument.findUnique({
+    where: { id },
   });
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (existing.createdBy !== user.id) {
+  if (existing.createdById !== user.id) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  await db
-    .update(schema.documents)
-    .set({ status: "rejected", updatedAt: new Date() })
-    .where(eq(schema.documents.id, id));
+  await prisma.mrpDocument.update({
+    where: { id },
+    data: { status: "rejected", updatedAt: new Date() },
+  });
 
   return NextResponse.json({ ok: true });
 }

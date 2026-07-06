@@ -1,10 +1,9 @@
-import { asc, eq } from "drizzle-orm";
 import { setRequestLocale, getTranslations } from "next-intl/server";
 
 import { RecipeExceptionsSection } from "@/components/stock/recipe-exceptions-section";
 import { RecipesBrowser } from "@/components/stock/recipes-browser";
 import { RecipesPageShell } from "@/components/stock/recipes-page-shell";
-import { db, schema } from "@/lib/db/client";
+import { prisma } from "@/lib/prisma";
 import { requireSessionUser } from "@/lib/auth/session";
 import { ensureStockReferenceData } from "@/lib/stock";
 import {
@@ -41,20 +40,16 @@ export default async function RecipesPage({
     activeExceptions,
   ] = await Promise.all([
     listBoothModelsWithRecipes(),
-    db
-      .select({ id: schema.boothModels.id, name: schema.boothModels.name })
-      .from(schema.boothModels)
-      .where(eq(schema.boothModels.isActive, true))
-      .orderBy(asc(schema.boothModels.name)),
-    db
-      .select({
-        id: schema.materials.id,
-        code: schema.materials.code,
-        name: schema.materials.name,
-      })
-      .from(schema.materials)
-      .where(eq(schema.materials.isActive, true))
-      .orderBy(asc(schema.materials.name)),
+    prisma.mrpBoothModel.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
+    prisma.mrpMaterial.findMany({
+      where: { isActive: true },
+      select: { id: true, code: true, name: true },
+      orderBy: { name: "asc" },
+    }),
     listManufacturingBatchOptions(),
     listRecipeExceptions("active"),
   ]);
