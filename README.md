@@ -124,6 +124,16 @@ public/icons/                 # PWA icons (generated from icon.svg via scripts/m
 
 ---
 
+## Deploy
+
+Production: **[mrp.meavo.app](https://mrp.meavo.app)** (Vercel project `meavo-gateway/meavo-mrp`, Frankfurt region).
+
+1. Fill `.env.local` from `.env.example` (Supabase + Gemini keys).
+2. Push secrets to Vercel: `bash scripts/push-env-to-vercel.sh`
+3. Apply schema once: `pnpm db:push` (or `pnpm db:migrate` after migrations exist).
+4. In Google Cloud OAuth, add `https://mrp.meavo.app` to **Authorized JavaScript origins**.
+5. Pushes to `main` auto-deploy via the GitHub integration.
+
 ## Roadmap
 
 - [x] **Phase 1 — MVP**: scaffold, i18n, capture, AI extraction, review UI,
