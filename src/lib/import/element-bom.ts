@@ -95,6 +95,15 @@ export async function importElementBomCsv(text: string): Promise<ImportResult> {
 
   await syncBomMissingFromMaterialCodes(parsed.map((l) => l.materialCode));
 
+  const materials = await prisma.mrpMaterial.findMany({
+    select: { id: true, code: true },
+  });
+  const materialByCode = new Map(
+    materials
+      .filter((m) => m.code)
+      .map((m) => [m.code!, m.id]),
+  );
+
   const byModel = new Map<string, BomLineInput[]>();
   for (const line of parsed) {
     const bucket = byModel.get(line.boothModel) ?? [];
@@ -113,66 +122,76 @@ export async function importElementBomCsv(text: string): Promise<ImportResult> {
     }
 
     try {
-      await prisma.$transaction(async (tx) => {
-        const boothModelId = await ensureBoothModelId(boothModel);
+      const boothModelId = await ensureBoothModelId(boothModel);
 
-        const elements = await tx.mrpBoothElement.findMany({
-          where: { boothModelId },
-          select: { id: true, simpleName: true },
-        });
-
-        const elementBySimple = new Map(
-          elements.map((e) => [e.simpleName, e.id]),
-        );
-        const elementIds = elements.map((e) => e.id);
-
-        if (elementIds.length > 0) {
-          await tx.mrpElementBomLine.deleteMany({
-            where: { boothElementId: { in: elementIds } },
-          });
-        }
-
-        const materials = await tx.mrpMaterial.findMany();
-        const materialByCode = new Map(
-          materials
-            .filter((m) => m.code)
-            .map((m) => [m.code!, m.id]),
-        );
-
-        let inserted = 0;
-        for (const line of lines) {
-          const materialId = materialByCode.get(line.materialCode);
-          if (!materialId) {
-            result.skipped++;
-            result.warnings.push({
-              row: line.row,
-              message: `Skipped unknown material_code "${line.materialCode}"`,
-            });
-            continue;
-          }
-
-          const boothElementId = elementBySimple.get(line.element);
-          if (!boothElementId) {
-            result.ok = false;
-            throw new Error(
-              `Row ${line.row}: unknown element "${line.element}" for model ${boothModel}`,
-            );
-          }
-
-          await tx.mrpElementBomLine.create({
-            data: {
-              boothElementId,
-              materialId,
-              colour: line.colour,
-              market: line.market,
-              quantity: line.quantity,
-            },
-          });
-          inserted++;
-        }
-
-        result.created += inserted;
+      const elements = await prisma.mrpBoothElement.findMany({
+        where: { boothModelId },
+        select: { id: true, simpleName: true },
       });
+
+      const elementBySimple = new Map(
+        elements.map((e) => [e.simpleName, e.id]),
+      );
+      const elementIds = elements.map((e) => e.id);
+
+      const toInsert: {
+        boothElementId: string;
+        materialId: string;
+        colour: string | null;
+        market: string | null;
+        quantity: string;
+      }[] = [];
+      let modelOk = true;
+
+      for (const line of lines) {
+        const materialId = materialByCode.get(line.materialCode);
+        if (!materialId) {
+          result.skipped++;
+          result.warnings.push({
+            row: line.row,
+            message: `Skipped unknown material_code "${line.materialCode}"`,
+          });
+          continue;
+        }
+
+        const boothElementId = elementBySimple.get(line.element);
+        if (!boothElementId) {
+          modelOk = false;
+          result.ok = false;
+          result.errors.push({
+            row: line.row,
+            message: `unknown element "${line.element}" for model ${boothModel}`,
+          });
+          continue;
+        }
+
+        toInsert.push({
+          boothElementId,
+          materialId,
+          colour: line.colour,
+          market: line.market,
+          quantity: line.quantity,
+        });
+      }
+
+      if (!modelOk) continue;
+
+      await prisma.$transaction(
+        async (tx) => {
+          if (elementIds.length > 0) {
+            await tx.mrpElementBomLine.deleteMany({
+              where: { boothElementId: { in: elementIds } },
+            });
+          }
+
+          if (toInsert.length > 0) {
+            await tx.mrpElementBomLine.createMany({ data: toInsert });
+          }
+        },
+        { timeout: 60_000 },
+      );
+
+      result.created += toInsert.length;
     } catch (err) {
       result.ok = false;
       result.errors.push({
