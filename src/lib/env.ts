@@ -27,6 +27,10 @@ const ServerEnvSchema = z.object({
   ZERON_API_BASE_URL: z.string().optional(),
   ZERON_API_KEY: z.string().optional(),
   ZERON_EXPORT_EMAIL: z.string().optional(),
+
+  GOOGLE_SHEETS_MASTER_ID: z.string().optional(),
+  GOOGLE_SERVICE_ACCOUNT_JSON: z.string().optional(),
+  CRON_SECRET: z.string().optional(),
 });
 
 export type ServerEnv = z.infer<typeof ServerEnvSchema>;

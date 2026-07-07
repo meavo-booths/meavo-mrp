@@ -8,6 +8,15 @@
     },
     "src/app/api/zeron/sync/route.ts": {
       "maxDuration": 30
+    },
+    "src/app/api/sheets/sync/route.ts": {
+      "maxDuration": 120
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/sheets/sync",
+      "schedule": "0 */2 * * *"
+    }
+  ]
 }

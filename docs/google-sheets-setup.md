@@ -27,6 +27,15 @@ CRON_SECRET=your-random-secret
 
 ## 4. After env is set
 
-Run sync manually: `POST /api/sheets/sync` (to be implemented) or wait for cron.
+Trigger sync manually:
 
-See manufacturing mapping in the project plan: tab `Статус на партиди`, batch files tab `Опаковане`.
+```bash
+curl -X POST https://mrp.meavo.app/api/sheets/sync \
+  -H "Authorization: Bearer $CRON_SECRET"
+```
+
+Or sign in as an **admin** user and `POST /api/sheets/sync` from the browser devtools.
+
+Vercel cron runs every 2 hours (`vercel.json` → `/api/sheets/sync`).
+
+See manufacturing mapping: tab `Статус на партиди`, batch files tab `Опаковане`.
