@@ -73,6 +73,7 @@ async function runPool<T, R>(
 
 type LookupCaches = {
   boothModelId: Map<string, string>;
+  boothModelInFlight: Map<string, Promise<string>>;
   warehouseId: Map<string, string>;
   elementsByModelId: Map<string, Map<string, string>>;
 };
@@ -103,25 +104,45 @@ async function buildLookupCaches(): Promise<LookupCaches> {
     modelMap.set(header, element.id);
   }
 
-  return { boothModelId, warehouseId, elementsByModelId };
+  return {
+    boothModelId,
+    boothModelInFlight: new Map(),
+    warehouseId,
+    elementsByModelId,
+  };
 }
 
 async function resolveBoothModelId(
   caches: LookupCaches,
   modelName: string,
 ): Promise<string | null> {
-  const key = modelName.trim().toLowerCase();
+  const trimmed = modelName.trim();
+  const key = trimmed.toLowerCase();
   if (!key) return null;
 
   const cached = caches.boothModelId.get(key);
   if (cached) return cached;
 
-  const created = await prisma.mrpBoothModel.create({
-    data: { name: modelName.trim() },
-    select: { id: true, name: true },
-  });
-  caches.boothModelId.set(key, created.id);
-  return created.id;
+  const inFlight = caches.boothModelInFlight.get(key);
+  if (inFlight) return inFlight;
+
+  const promise = prisma.mrpBoothModel
+    .upsert({
+      where: { name: trimmed },
+      create: { name: trimmed },
+      update: {},
+      select: { id: true },
+    })
+    .then((row) => {
+      caches.boothModelId.set(key, row.id);
+      return row.id;
+    })
+    .finally(() => {
+      caches.boothModelInFlight.delete(key);
+    });
+
+  caches.boothModelInFlight.set(key, promise);
+  return promise;
 }
 
 async function upsertMasterBatch(
