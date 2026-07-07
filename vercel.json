@@ -10,7 +10,7 @@
       "maxDuration": 30
     },
     "src/app/api/sheets/sync/route.ts": {
-      "maxDuration": 120
+      "maxDuration": 300
     }
   },
   "crons": [

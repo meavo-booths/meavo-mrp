@@ -5,7 +5,7 @@ import { isAuthorizedCronRequest } from "@/lib/cron-auth";
 import { runSheetSync } from "@/lib/sheets/sync";
 
 export const runtime = "nodejs";
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 async function authorize(request: Request): Promise<NextResponse | null> {
   if (isAuthorizedCronRequest(request)) return null;
