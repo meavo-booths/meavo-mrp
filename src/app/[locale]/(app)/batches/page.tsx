@@ -3,7 +3,6 @@ import { setRequestLocale, getTranslations } from "next-intl/server";
 import { BatchesTable } from "@/components/stock/batches-table";
 import { requireSessionUser } from "@/lib/auth/session";
 import { listManufacturingBatches } from "@/lib/stock/manufacturing-batches";
-import { formatDate } from "@/lib/utils/format";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +27,7 @@ export default async function BatchesPage({
 
       <BatchesTable
         batches={batches}
-        formatSynced={(value) => formatDate(value, locale)}
+        locale={locale}
         labels={{
           filterAll: t("filterAll"),
           statusPlanned: t("status.planned"),

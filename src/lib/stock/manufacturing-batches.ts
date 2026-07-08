@@ -1,20 +1,9 @@
 import "server-only";
 
-import type { MrpManufacturingBatchStatus } from "@prisma/client";
-
 import { prisma } from "@/lib/prisma";
+import type { ManufacturingBatchRow } from "@/lib/stock/manufacturing-batch-types";
 
-export type ManufacturingBatchRow = {
-  id: string;
-  name: string;
-  status: MrpManufacturingBatchStatus;
-  qty: number | null;
-  modelName: string | null;
-  warehouseName: string | null;
-  unitCount: number;
-  batchSpreadsheetId: string | null;
-  lastSyncedAt: Date | null;
-};
+export type { ManufacturingBatchRow } from "@/lib/stock/manufacturing-batch-types";
 
 export function batchSpreadsheetUrl(spreadsheetId: string | null): string | null {
   if (!spreadsheetId?.trim()) return null;

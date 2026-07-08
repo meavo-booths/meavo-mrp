@@ -3,7 +3,8 @@
 import * as React from "react";
 import { ExternalLink } from "lucide-react";
 
-import type { ManufacturingBatchRow } from "@/lib/stock/manufacturing-batches";
+import type { ManufacturingBatchRow } from "@/lib/stock/manufacturing-batch-types";
+import { formatDate } from "@/lib/utils/format";
 import { cn } from "@/lib/utils/cn";
 
 function batchSpreadsheetUrl(spreadsheetId: string | null): string | null {
@@ -35,7 +36,7 @@ type Labels = {
 type Props = {
   batches: ManufacturingBatchRow[];
   labels: Labels;
-  formatSynced: (value: Date | null) => string;
+  locale: string;
 };
 
 const STATUS_ORDER: ManufacturingBatchRow["status"][] = [
@@ -74,7 +75,7 @@ function statusClass(status: ManufacturingBatchRow["status"]): string {
   }
 }
 
-export function BatchesTable({ batches, labels, formatSynced }: Props) {
+export function BatchesTable({ batches, labels, locale }: Props) {
   const [filter, setFilter] = React.useState<StatusFilter>("all");
 
   const counts = React.useMemo(() => {
@@ -169,7 +170,7 @@ export function BatchesTable({ batches, labels, formatSynced }: Props) {
                       {batch.unitCount > 0 ? batch.unitCount : "—"}
                     </td>
                     <td className="px-3 py-2 text-muted-foreground">
-                      {formatSynced(batch.lastSyncedAt)}
+                      {formatDate(batch.lastSyncedAt, locale)}
                     </td>
                     <td className="px-3 py-2">
                       {sheetUrl ? (
