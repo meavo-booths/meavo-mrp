@@ -72,9 +72,16 @@ function formatQty(n: number): string {
 async function loadBomRowsForModel(modelName: string): Promise<RawBomRow[]> {
   const rows = await prisma.mrpElementBomLine.findMany({
     where: { boothElement: { boothModel: { name: modelName } } },
-    include: {
-      boothElement: true,
-      material: true,
+    select: {
+      colour: true,
+      market: true,
+      quantity: true,
+      boothElement: {
+        select: { simpleName: true, sortOrder: true },
+      },
+      material: {
+        select: { code: true, name: true, unitPriceEur: true },
+      },
     },
     orderBy: [
       { boothElement: { sortOrder: "asc" } },

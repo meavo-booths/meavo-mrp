@@ -1,17 +1,10 @@
 import { setRequestLocale, getTranslations } from "next-intl/server";
 
-import { RecipeExceptionsSection } from "@/components/stock/recipe-exceptions-section";
+import { RecipeExceptionsPanel } from "@/components/stock/recipe-exceptions-panel";
 import { RecipesBrowser } from "@/components/stock/recipes-browser";
 import { RecipesPageShell } from "@/components/stock/recipes-page-shell";
-import { prisma } from "@/lib/prisma";
 import { requireSessionUser } from "@/lib/auth/session";
-import { ensureStockReferenceData } from "@/lib/stock";
-import {
-  getBoothModelRecipe,
-  listBoothModelsWithRecipes,
-} from "@/lib/stock/bom-recipe-view";
-import { listManufacturingBatchOptions } from "@/lib/stock/inventory-batch";
-import { listRecipeExceptions } from "@/lib/stock/recipe-exceptions";
+import { listBoothModelsWithRecipes } from "@/lib/stock/bom-recipe-view";
 
 export const dynamic = "force-dynamic";
 
@@ -26,38 +19,11 @@ export default async function RecipesPage({
   const { model: modelParam } = await searchParams;
   setRequestLocale(locale);
   await requireSessionUser();
-  await ensureStockReferenceData();
 
   const t = await getTranslations("stock.recipes");
-  const te = await getTranslations("stock.recipes.exceptions");
   const tc = await getTranslations("stock.csv");
-
-  const [
-    models,
-    boothModels,
-    materials,
-    batches,
-    activeExceptions,
-  ] = await Promise.all([
-    listBoothModelsWithRecipes(),
-    prisma.mrpBoothModel.findMany({
-      where: { isActive: true },
-      select: { id: true, name: true },
-      orderBy: { name: "asc" },
-    }),
-    prisma.mrpMaterial.findMany({
-      where: { isActive: true },
-      select: { id: true, code: true, name: true },
-      orderBy: { name: "asc" },
-    }),
-    listManufacturingBatchOptions(),
-    listRecipeExceptions("active"),
-  ]);
-  const selectedModel = modelParam?.trim() ?? null;
-  const recipe =
-    selectedModel != null
-      ? await getBoothModelRecipe(selectedModel)
-      : null;
+  const models = await listBoothModelsWithRecipes();
+  const selectedModel = modelParam?.trim() || null;
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-6">
@@ -87,82 +53,40 @@ export default async function RecipesPage({
           </div>
         }
       >
-        <RecipeExceptionsSection
-          models={boothModels}
-          batches={batches}
-          materials={materials}
-          activeExceptions={activeExceptions}
+        <RecipeExceptionsPanel locale={locale} />
+        <RecipesBrowser
+          models={models}
+          selectedModel={selectedModel}
           labels={{
-            title: te("title"),
-            addException: te("addException"),
-            activeTitle: te("activeTitle"),
-            activeEmpty: te("activeEmpty"),
-            revert: te("revert"),
-            name: te("name"),
-            notes: te("notes"),
-            models: te("models"),
-            modelsHint: te("modelsHint"),
-            scopeMarket: te("scopeMarket"),
-            marketAll: te("marketAll"),
+            back: t("back"),
+            selectModel: t("selectModel"),
+            selectModelHint: t("selectModelHint"),
+            panels: t("panels"),
+            bomLines: t("bomLines"),
+            noModels: t("empty"),
+            loading: t("loading"),
+            loadError: t("loadError"),
+            notFound: t("notFound"),
+            colour: t("colour"),
+            market: t("market"),
             marketDomestic: t("marketDomestic"),
             marketUs: t("marketUs"),
-            scopeColour: te("scopeColour"),
-            scopeColourHint: te("scopeColourHint"),
-            panel: te("panel"),
-            sourceLine: te("sourceLine"),
-            sourceLinePlaceholder: te("sourceLinePlaceholder"),
-            replacements: te("replacements"),
-            addReplacement: te("addReplacement"),
-            quantity: te("quantity"),
-            batches: te("batches"),
-            batchesHint: te("batchesHint"),
-            batchLabel: te("batchLabel"),
-            wholeBatch: te("wholeBatch"),
-            boothIds: te("boothIds"),
-            boothIdsHint: te("boothIdsHint"),
-            addBatch: te("addBatch"),
-            submit: te("submit"),
-            cancel: te("cancel"),
-            error: te("error"),
-            material: t("columns.material"),
-            materialSearchPlaceholder: te("materialSearchPlaceholder"),
-            materialUnknown: te("materialUnknown"),
+            noColourOption: t("noColourOption"),
+            topMaterialsTitle: t("topMaterialsTitle"),
+            topMaterialsHint: t("topMaterialsHint"),
+            recipeTitle: t("recipeTitle"),
+            recipeDescription: t("recipeDescription"),
+            materialCount: t("materialCount"),
             wildcard: t("wildcard"),
+            columns: {
+              material: t("columns.material"),
+              colour: t("columns.colour"),
+              market: t("columns.market"),
+              qty: t("columns.qty"),
+              panels: t("columns.panels"),
+            },
           }}
         />
-        <RecipesBrowser
-        models={models}
-        recipe={recipe}
-        selectedModel={
-          recipe != null || selectedModel == null ? selectedModel : null
-        }
-        labels={{
-          back: t("back"),
-          selectModel: t("selectModel"),
-          selectModelHint: t("selectModelHint"),
-          panels: t("panels"),
-          bomLines: t("bomLines"),
-          noModels: t("empty"),
-          colour: t("colour"),
-          market: t("market"),
-          marketDomestic: t("marketDomestic"),
-          marketUs: t("marketUs"),
-          noColourOption: t("noColourOption"),
-          topMaterialsTitle: t("topMaterialsTitle"),
-          topMaterialsHint: t("topMaterialsHint"),
-          recipeTitle: t("recipeTitle"),
-          recipeDescription: t("recipeDescription"),
-          materialCount: t("materialCount"),
-          wildcard: t("wildcard"),
-          columns: {
-            material: t("columns.material"),
-            colour: t("columns.colour"),
-            market: t("columns.market"),
-            qty: t("columns.qty"),
-            panels: t("columns.panels"),
-          },
-        }}
-      />
       </RecipesPageShell>
     </div>
   );

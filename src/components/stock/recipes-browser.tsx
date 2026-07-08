@@ -31,6 +31,9 @@ type Labels = {
   panels: string;
   bomLines: string;
   noModels: string;
+  loading: string;
+  loadError: string;
+  notFound: string;
   colour: string;
   market: string;
   marketDomestic: string;
@@ -53,7 +56,6 @@ type Labels = {
 
 type Props = {
   models: BoothModelSummary[];
-  recipe: BoothModelRecipe | null;
   selectedModel: string | null;
   labels: Labels;
 };
@@ -275,13 +277,103 @@ function RecipeDetail({
 
 export function RecipesBrowser({
   models,
-  recipe,
   selectedModel,
   labels,
 }: Props) {
   const router = useRouter();
+  const [recipe, setRecipe] = React.useState<BoothModelRecipe | null>(null);
+  const [loading, setLoading] = React.useState(false);
+  const [loadError, setLoadError] = React.useState<string | null>(null);
 
-  if (selectedModel && recipe) {
+  React.useEffect(() => {
+    if (!selectedModel) {
+      setRecipe(null);
+      setLoadError(null);
+      setLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    setLoading(true);
+    setLoadError(null);
+    setRecipe(null);
+
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/recipes/${encodeURIComponent(selectedModel)}`,
+          { signal: controller.signal },
+        );
+        if (!res.ok) {
+          if (res.status === 404) {
+            setLoadError(labels.notFound);
+            return;
+          }
+          throw new Error(`HTTP ${res.status}`);
+        }
+        const data = (await res.json()) as BoothModelRecipe;
+        setRecipe(data);
+      } catch (err) {
+        if (controller.signal.aborted) return;
+        setLoadError(
+          err instanceof Error ? err.message : labels.loadError,
+        );
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      }
+    })();
+
+    return () => controller.abort();
+  }, [labels.loadError, labels.notFound, selectedModel]);
+
+  if (selectedModel) {
+    if (loading) {
+      return (
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="-ml-2 h-8 gap-1.5 px-2"
+              onClick={() => router.push("/recipes")}
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              {labels.back}
+            </Button>
+            <h2 className="text-xl font-semibold tracking-tight">
+              {selectedModel}
+            </h2>
+          </div>
+          <div className="space-y-3 rounded-xl border border-border bg-card p-4">
+            <div className="h-8 w-full max-w-md animate-pulse rounded-md bg-muted" />
+            <div className="h-40 animate-pulse rounded-md bg-muted/70" />
+            <p className="text-sm text-muted-foreground">{labels.loading}</p>
+          </div>
+        </div>
+      );
+    }
+
+    if (loadError || !recipe) {
+      return (
+        <div className="space-y-3">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="-ml-2 h-8 gap-1.5 px-2"
+            onClick={() => router.push("/recipes")}
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            {labels.back}
+          </Button>
+          <p className="text-sm text-destructive">
+            {loadError ?? labels.notFound}
+          </p>
+        </div>
+      );
+    }
+
     return (
       <RecipeDetail
         recipe={recipe}

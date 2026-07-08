@@ -35,6 +35,7 @@
     "materials": "Materials",
     "receipt": "Receipt",
     "inventory": "Inventory",
+    "batches": "Batches",
     "recipes": "Recipes",
     "scan": "Scan",
     "documents": "Documents",
@@ -141,6 +142,9 @@
       "materialCount": "materials",
       "panelSection": "Panel",
       "empty": "No recipes yet — import Panel List and Recipes CSV.",
+      "loading": "Loading recipe…",
+      "loadError": "Could not load recipe.",
+      "notFound": "No recipe found for this model.",
       "columns": {
         "material": "Material",
         "colour": "Colour",
@@ -223,6 +227,30 @@
       "historyTitle": "Recent counts",
       "historyDescription": "Variance is shown only when a recount differs from existing on-hand stock.",
       "historyEmpty": "No inventory counts yet."
+    },
+    "batches": {
+      "title": "Production batches",
+      "subtitle": "Synced from the master „Статус на партиди“ sheet.",
+      "filterAll": "All",
+      "openSheet": "Open sheet",
+      "noSheet": "No link",
+      "empty": "No batches match this filter.",
+      "status": {
+        "planned": "Planned",
+        "inProduction": "In production",
+        "completed": "Completed",
+        "cancelled": "Cancelled"
+      },
+      "columns": {
+        "name": "Batch",
+        "status": "Status",
+        "model": "Model",
+        "qty": "Qty",
+        "warehouse": "Warehouse",
+        "units": "Units synced",
+        "synced": "Last sync",
+        "sheet": "Sheet"
+      }
     }
   },
   "scan": {
