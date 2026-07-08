@@ -40,6 +40,7 @@ export default async function BatchesPage({
           colQty: t("columns.qty"),
           colWarehouse: t("columns.warehouse"),
           colUnits: t("columns.units"),
+          colComplete: t("columns.complete"),
           colSynced: t("columns.synced"),
           colSheet: t("columns.sheet"),
           openSheet: t("openSheet"),

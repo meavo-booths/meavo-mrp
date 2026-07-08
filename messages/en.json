@@ -230,7 +230,8 @@
     },
     "batches": {
       "title": "Production batches",
-      "subtitle": "Synced from the master „Статус на партиди“ sheet.",
+      "subtitle": "Synced from the master „Статус на партиди“ sheet. Aksakovo batches are listed first.",
+      "back": "All batches",
       "filterAll": "All",
       "openSheet": "Open sheet",
       "noSheet": "No link",
@@ -248,8 +249,17 @@
         "qty": "Qty",
         "warehouse": "Warehouse",
         "units": "Units synced",
+        "complete": "Complete",
         "synced": "Last sync",
         "sheet": "Sheet"
+      },
+      "detail": {
+        "boothId": "Booth ID",
+        "colour": "Colour",
+        "unitProgress": "Unit %",
+        "noUnits": "No packing rows synced for this batch yet.",
+        "ticked": "Panel complete",
+        "notTicked": "Panel not complete"
       }
     }
   },

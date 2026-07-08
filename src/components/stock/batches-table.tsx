@@ -3,6 +3,7 @@
 import * as React from "react";
 import { ExternalLink } from "lucide-react";
 
+import { useRouter } from "@/i18n/navigation";
 import type { ManufacturingBatchRow } from "@/lib/stock/manufacturing-batch-types";
 import { formatDate } from "@/lib/utils/format";
 import { cn } from "@/lib/utils/cn";
@@ -26,6 +27,7 @@ type Labels = {
   colQty: string;
   colWarehouse: string;
   colUnits: string;
+  colComplete: string;
   colSynced: string;
   colSheet: string;
   openSheet: string;
@@ -75,8 +77,27 @@ function statusClass(status: ManufacturingBatchRow["status"]): string {
   }
 }
 
+function CompletenessCell({ value }: { value: number | null }) {
+  if (value == null) {
+    return <span className="text-muted-foreground">—</span>;
+  }
+
+  return (
+    <div className="flex min-w-[5rem] items-center justify-end gap-2">
+      <div className="h-1.5 w-14 overflow-hidden rounded-full bg-muted">
+        <div
+          className="h-full rounded-full bg-emerald-500"
+          style={{ width: `${Math.min(100, value)}%` }}
+        />
+      </div>
+      <span className="tabular-nums">{value}%</span>
+    </div>
+  );
+}
+
 export function BatchesTable({ batches, labels, locale }: Props) {
-  const [filter, setFilter] = React.useState<StatusFilter>("all");
+  const router = useRouter();
+  const [filter, setFilter] = React.useState<StatusFilter>("in_production");
 
   const counts = React.useMemo(() => {
     const map = new Map<ManufacturingBatchRow["status"], number>();
@@ -125,7 +146,7 @@ export function BatchesTable({ batches, labels, locale }: Props) {
         <p className="text-sm text-muted-foreground">{labels.empty}</p>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-border">
-          <table className="w-full min-w-[52rem] text-sm">
+          <table className="w-full min-w-[58rem] text-sm">
             <thead>
               <tr className="border-b bg-muted/40 text-left text-xs text-muted-foreground">
                 <th className="px-3 py-2 font-medium">{labels.colName}</th>
@@ -134,6 +155,7 @@ export function BatchesTable({ batches, labels, locale }: Props) {
                 <th className="px-3 py-2 text-right font-medium">{labels.colQty}</th>
                 <th className="px-3 py-2 font-medium">{labels.colWarehouse}</th>
                 <th className="px-3 py-2 text-right font-medium">{labels.colUnits}</th>
+                <th className="px-3 py-2 text-right font-medium">{labels.colComplete}</th>
                 <th className="px-3 py-2 font-medium">{labels.colSynced}</th>
                 <th className="px-3 py-2 font-medium">{labels.colSheet}</th>
               </tr>
@@ -144,7 +166,8 @@ export function BatchesTable({ batches, labels, locale }: Props) {
                 return (
                   <tr
                     key={batch.id}
-                    className="border-b border-border/50 last:border-0 odd:bg-background/40"
+                    className="group cursor-pointer border-b border-border/50 last:border-0 odd:bg-background/40 hover:bg-secondary/60"
+                    onClick={() => router.push(`/batches/${batch.id}`)}
                   >
                     <td className="px-3 py-2 font-medium">{batch.name}</td>
                     <td className="px-3 py-2">
@@ -169,6 +192,9 @@ export function BatchesTable({ batches, labels, locale }: Props) {
                     <td className="px-3 py-2 text-right tabular-nums">
                       {batch.unitCount > 0 ? batch.unitCount : "—"}
                     </td>
+                    <td className="px-3 py-2">
+                      <CompletenessCell value={batch.completenessPct} />
+                    </td>
                     <td className="px-3 py-2 text-muted-foreground">
                       {formatDate(batch.lastSyncedAt, locale)}
                     </td>
@@ -179,6 +205,7 @@ export function BatchesTable({ batches, labels, locale }: Props) {
                           target="_blank"
                           rel="noopener noreferrer"
                           className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                          onClick={(e) => e.stopPropagation()}
                         >
                           {labels.openSheet}
                           <ExternalLink className="h-3 w-3" />
