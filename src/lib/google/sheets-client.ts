@@ -7,20 +7,26 @@ export type SheetsGridCell = {
   hyperlink?: string;
 };
 
-async function getAccessToken(readonly = true): Promise<string> {
+async function getAccessToken(
+  readonly = true,
+  extraScopes: string[] = [],
+): Promise<string> {
   const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
   if (!raw) {
     throw new Error("GOOGLE_SERVICE_ACCOUNT_JSON is not set");
   }
 
+  const scopes = new Set([
+    readonly
+      ? "https://www.googleapis.com/auth/spreadsheets.readonly"
+      : "https://www.googleapis.com/auth/spreadsheets",
+    ...extraScopes,
+  ]);
+
   const credentials = JSON.parse(raw) as Record<string, unknown>;
   const auth = new GoogleAuth({
     credentials,
-    scopes: [
-      readonly
-        ? "https://www.googleapis.com/auth/spreadsheets.readonly"
-        : "https://www.googleapis.com/auth/spreadsheets",
-    ],
+    scopes: [...scopes],
   });
   const client = await auth.getClient();
   const token = await client.getAccessToken();
@@ -88,4 +94,45 @@ export function extractSpreadsheetId(url: string | undefined): string | null {
   if (!url) return null;
   const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
   return match?.[1] ?? null;
+}
+
+export function batchNameSearchVariants(batchCode: string): string[] {
+  const trimmed = batchCode.trim();
+  const upper = trimmed.toUpperCase();
+  const variants = new Set<string>([trimmed, upper, upper.replace(/\s+/g, "")]);
+
+  const m = upper.match(/^([A-Z]{2})\s*(\d+)$/);
+  if (m) {
+    variants.add(`${m[1]}${m[2]}`);
+    variants.add(`${m[1]} ${m[2]}`);
+  }
+
+  return [...variants];
+}
+
+/** Find a batch spreadsheet in Drive when the master sheet cell has no hyperlink. */
+export async function findSpreadsheetIdByBatchName(
+  batchCode: string,
+): Promise<string | null> {
+  const token = await getAccessToken(true, [
+    "https://www.googleapis.com/auth/drive.readonly",
+  ]);
+
+  for (const name of batchNameSearchVariants(batchCode)) {
+    const q = encodeURIComponent(
+      `name='${name.replace(/'/g, "\\'")}' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false`,
+    );
+    const url = `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)&pageSize=3`;
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    });
+    if (!res.ok) continue;
+
+    const data = (await res.json()) as { files?: Array<{ id: string }> };
+    const id = data.files?.[0]?.id;
+    if (id) return id;
+  }
+
+  return null;
 }

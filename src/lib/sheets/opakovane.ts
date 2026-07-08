@@ -1,5 +1,7 @@
 import "server-only";
 
+import { OPAKOVANE_COL } from "@/lib/sheets/config";
+
 export function normalizeSheetHeader(value: string): string {
   return value.replace(/\r\n/g, "\n").trim();
 }
@@ -7,7 +9,7 @@ export function normalizeSheetHeader(value: string): string {
 export function parseCheckboxValue(raw: string | undefined): boolean {
   if (!raw) return false;
   const s = raw.trim().toUpperCase();
-  return s === "TRUE" || s === "YES" || s === "1";
+  return s === "TRUE" || s === "YES" || s === "1" || s === "✓";
 }
 
 export type OpakovaneColumn = {
@@ -20,6 +22,7 @@ export type ParsedOpakovaneUnit = {
   modelName: string;
   colour: string | null;
   boothIdText: string;
+  workshopNote: string | null;
   progressPct: string | null;
   elements: Array<{
     sheetHeader: string;
@@ -27,8 +30,25 @@ export type ParsedOpakovaneUnit = {
   }>;
 };
 
+const SKIP_BOOTH_ID_RE =
+  /^(ЗА\s*СКЛАД|НАПРАВЕНО|FOR\s*WAREHOUSE)$/i;
+
 function cell(row: string[] | undefined, index: number): string {
   return row?.[index]?.trim() ?? "";
+}
+
+/** Booth ID is column D; column C is insulation colour on current sheet templates. */
+export function readBoothIdText(row: string[] | undefined): string {
+  const primary = cell(row, OPAKOVANE_COL.boothId);
+  if (primary) return primary;
+  return cell(row, OPAKOVANE_COL.insulationColour);
+}
+
+export function isOpakovaneDataRow(boothIdText: string): boolean {
+  const id = boothIdText.trim();
+  if (!id) return false;
+  if (SKIP_BOOTH_ID_RE.test(id)) return false;
+  return true;
 }
 
 /** Find the packing header row and map element columns to sheet_header labels. */
@@ -42,7 +62,7 @@ export function findOpakovaneHeaderRow(
     const row = rows[i] ?? [];
     const columns: OpakovaneColumn[] = [];
 
-    for (let col = 3; col < row.length; col++) {
+    for (let col = OPAKOVANE_COL.firstPanel; col < row.length; col++) {
       const header = normalizeSheetHeader(cell(row, col));
       if (!header) continue;
       if (knownHeaders.has(header)) {
@@ -70,11 +90,12 @@ export function parseOpakovaneTab(
 
   for (let i = dataStart; i < rows.length; i++) {
     const row = rows[i];
-    const boothIdText = cell(row, 2);
-    if (!boothIdText) continue;
+    const boothIdText = readBoothIdText(row);
+    if (!isOpakovaneDataRow(boothIdText)) continue;
 
-    const modelName = cell(row, 0);
-    const colour = cell(row, 1) || null;
+    const modelName = cell(row, OPAKOVANE_COL.model);
+    const colour = cell(row, OPAKOVANE_COL.colour) || null;
+    const workshopNote = cell(row, OPAKOVANE_COL.workshopNote) || null;
 
     const elements = header.columns.map(({ colIndex, sheetHeader }) => ({
       sheetHeader,
@@ -92,6 +113,7 @@ export function parseOpakovaneTab(
       modelName,
       colour,
       boothIdText,
+      workshopNote,
       progressPct,
       elements,
     });

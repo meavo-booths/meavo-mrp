@@ -6,6 +6,7 @@ import {
   extractSpreadsheetId,
   fetchSheetGrid,
   fetchSheetValues,
+  findSpreadsheetIdByBatchName,
 } from "@/lib/google/sheets-client";
 import { prisma } from "@/lib/prisma";
 import { ensureStockReferenceData } from "@/lib/stock/seed";
@@ -150,9 +151,17 @@ async function upsertMasterBatch(
   caches: LookupCaches,
 ): Promise<MrpManufacturingBatch> {
   const section = BATCH_STATUS_SECTIONS.find((s) => s.factory === parsed.factory)!;
-  const [boothModelId, warehouseId] = await Promise.all([
+  const [boothModelId, warehouseId, batchSpreadsheetId] = await Promise.all([
     resolveBoothModelId(caches, parsed.modelName),
     Promise.resolve(caches.warehouseId.get(section.warehouseCode) ?? null),
+    (async () => {
+      if (parsed.batchSpreadsheetId) return parsed.batchSpreadsheetId;
+      try {
+        return await findSpreadsheetIdByBatchName(parsed.batchCode);
+      } catch {
+        return null;
+      }
+    })(),
   ]);
 
   return prisma.mrpManufacturingBatch.upsert({
@@ -164,7 +173,7 @@ async function upsertMasterBatch(
       qty: parsed.qty,
       warehouseId,
       masterSheetRowKey: parsed.rowKey,
-      batchSpreadsheetId: parsed.batchSpreadsheetId,
+      batchSpreadsheetId,
       lastSyncedAt: new Date(),
     },
     update: {
@@ -173,7 +182,7 @@ async function upsertMasterBatch(
       boothModelId,
       qty: parsed.qty,
       warehouseId,
-      batchSpreadsheetId: parsed.batchSpreadsheetId ?? undefined,
+      batchSpreadsheetId: batchSpreadsheetId ?? undefined,
       lastSyncedAt: new Date(),
     },
   });
@@ -206,6 +215,14 @@ async function syncBatchPackingTab(
 
   await prisma.$transaction(
     async (tx) => {
+      const parsedRowIndices = new Set(units.map((unit) => unit.sheetRowIndex));
+
+      for (const existing of existingUnits) {
+        if (!parsedRowIndices.has(existing.sheetRowIndex)) {
+          await tx.mrpBatchUnit.delete({ where: { id: existing.id } });
+        }
+      }
+
       for (const unit of units) {
         const existingUnit = existingByRow.get(unit.sheetRowIndex);
         const batchUnit = existingUnit

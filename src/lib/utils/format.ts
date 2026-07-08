@@ -1,19 +1,17 @@
 /** Convenience wrappers around Intl for the two project locales. */
 
-const dateOptionsShort: Intl.DateTimeFormatOptions = {
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-};
-
+/** Format as DD/MM/YYYY (day first, regardless of UI locale). */
 export function formatDate(
   value: Date | string | null | undefined,
-  locale: string,
+  _locale?: string,
 ): string {
   if (!value) return "—";
   const d = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(d.getTime())) return "—";
-  return new Intl.DateTimeFormat(locale, dateOptionsShort).format(d);
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const year = d.getFullYear();
+  return `${day}/${month}/${year}`;
 }
 
 export function formatMoney(

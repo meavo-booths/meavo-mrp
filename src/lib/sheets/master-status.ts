@@ -60,8 +60,10 @@ export function parseMasterBatchStatusTab(
     const rowKey = masterSheetRowKey(section.factory, batchCode);
 
     const linkRowIndex = i - section.dataStartRow;
-    const hyperlink = gridCell(linkGrid[linkRowIndex], linkColumn)?.hyperlink;
-    const batchSpreadsheetId = extractSpreadsheetId(hyperlink);
+    const linkCell = gridCell(linkGrid[linkRowIndex], linkColumn);
+    const batchSpreadsheetId =
+      extractSpreadsheetId(linkCell?.hyperlink) ??
+      extractSpreadsheetId(linkCell?.formattedValue);
 
     byKey.set(rowKey, {
       factory: section.factory,

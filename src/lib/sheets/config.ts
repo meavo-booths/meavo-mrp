@@ -5,6 +5,16 @@ export type FactoryCode = "AKS" | "VAR" | "KAZ";
 export const BATCH_STATUS_TAB_NAME = "Статус на партиди";
 export const BATCH_PACKING_TAB_NAME = "Опаковане";
 
+/** Column indices on the batch Опаковане tab (0-based). */
+export const OPAKOVANE_COL = {
+  model: 0,
+  colour: 1,
+  insulationColour: 2,
+  boothId: 3,
+  workshopNote: 4,
+  firstPanel: 5,
+} as const;
+
 export const DEFAULT_MASTER_SHEET_ID =
   "1aly6kRe_01ZDH_MnzaTtH6uVrqdsUX_p8AUAvt8EdO4";
 
