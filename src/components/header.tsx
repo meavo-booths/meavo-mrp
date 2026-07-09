@@ -13,6 +13,7 @@ import {
   Package,
   ScrollText,
   Truck,
+  Zap,
 } from "lucide-react";
 
 import { MeavoLogo } from "@/components/brand/meavo-logo";
@@ -45,6 +46,7 @@ export function Header() {
   const stockItems = [
     { href: "/", label: t("home"), icon: Home },
     { href: "/materials", label: t("materials"), icon: Package },
+    { href: "/electrics", label: t("electrics"), icon: Zap },
     { href: "/stock/receipt", label: t("receipt"), icon: Truck },
     { href: "/inventory", label: t("inventory"), icon: ClipboardList },
     { href: "/batches", label: t("batches"), icon: Factory },

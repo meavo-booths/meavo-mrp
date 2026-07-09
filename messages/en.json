@@ -33,6 +33,7 @@
   "nav": {
     "home": "Home",
     "materials": "Materials",
+    "electrics": "Electrics",
     "receipt": "Receipt",
     "inventory": "Inventory",
     "batches": "Batches",
@@ -92,6 +93,11 @@
       "bomMissingTitle": "Materials missing from master list",
       "bomMissingDescription": "{count} code(s) appear in ElementBOM but are not in Materials — add them or re-import Materials.",
       "bomMissingLines": "BOM lines"
+    },
+    "electrics": {
+      "title": "Electrics",
+      "subtitle": "Electrical components and wiring stock.",
+      "placeholder": "Coming soon — electrical materials and BOM tracking will be added here."
     },
     "csv": {
       "materialsTitle": "CSV import / export",

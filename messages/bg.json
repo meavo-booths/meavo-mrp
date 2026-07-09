@@ -33,6 +33,7 @@
   "nav": {
     "home": "Начало",
     "materials": "Материали",
+    "electrics": "Електрика",
     "receipt": "Приход",
     "inventory": "Инвентаризация",
     "batches": "Партиди",
@@ -92,6 +93,11 @@
       "bomMissingTitle": "Липсващи материали в ElementBOM",
       "bomMissingDescription": "{count} кода са в ElementBOM, но не са в списъка с материали — добавете ги или импортирайте отново Materials.",
       "bomMissingLines": "BOM редове"
+    },
+    "electrics": {
+      "title": "Електрика",
+      "subtitle": "Електрически компоненти и кабелна наличност.",
+      "placeholder": "Очаквайте скоро — тук ще се добавят електрически материали и BOM проследяване."
     },
     "csv": {
       "materialsTitle": "CSV импорт / експорт",
