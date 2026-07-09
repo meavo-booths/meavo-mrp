@@ -30,6 +30,7 @@ type Props = {
     warehouse: string;
     quantity: string;
     date: string;
+    invoiceNumber: string;
     notes: string;
     submit: string;
     error: string;
@@ -56,6 +57,7 @@ export function ReceiptForm({
   const [effectiveAt, setEffectiveAt] = React.useState(
     () => new Date().toISOString().slice(0, 10),
   );
+  const [invoiceNumber, setInvoiceNumber] = React.useState("");
   const [notes, setNotes] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
   const [pending, setPending] = React.useState(false);
@@ -77,6 +79,7 @@ export function ReceiptForm({
           warehouseId,
           quantity: Number(quantity),
           effectiveAt,
+          invoiceNumber: invoiceNumber.trim() || undefined,
           notes: notes.trim() || undefined,
         }),
       });
@@ -85,6 +88,7 @@ export function ReceiptForm({
         throw new Error(data.error ?? labels.error);
       }
       setQuantity("");
+      setInvoiceNumber("");
       setNotes("");
       setMaterialCode("");
       router.refresh();
@@ -155,6 +159,14 @@ export function ReceiptForm({
             required
           />
         </div>
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="receipt-invoice">{labels.invoiceNumber}</Label>
+        <Input
+          id="receipt-invoice"
+          value={invoiceNumber}
+          onChange={(e) => setInvoiceNumber(e.target.value)}
+        />
       </div>
       <div className="space-y-2">
         <Label htmlFor="receipt-notes">{labels.notes}</Label>

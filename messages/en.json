@@ -206,6 +206,7 @@
       "warehouse": "Warehouse",
       "quantity": "Quantity",
       "date": "Date",
+      "invoiceNumber": "Invoice number",
       "notes": "Notes",
       "submit": "Save receipt",
       "error": "Save failed"

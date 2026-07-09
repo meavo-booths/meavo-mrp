@@ -63,6 +63,7 @@ export default async function ReceiptPage({
               warehouse: t("warehouse"),
               quantity: t("quantity"),
               date: t("date"),
+              invoiceNumber: t("invoiceNumber"),
               notes: t("notes"),
               submit: t("submit"),
               error: t("error"),

@@ -12,6 +12,7 @@ const BodySchema = z.object({
   quantity: z.coerce.number().positive(),
   effectiveAt: z.coerce.date().optional(),
   notes: z.string().trim().optional(),
+  invoiceNumber: z.string().trim().optional(),
 });
 
 export async function POST(request: Request) {
@@ -28,6 +29,9 @@ export async function POST(request: Request) {
     quantityDelta: body.quantity,
     effectiveAt: body.effectiveAt ?? new Date(),
     notes: body.notes ?? null,
+    metadata: body.invoiceNumber
+      ? { invoiceNumber: body.invoiceNumber }
+      : undefined,
     createdBy: user.id,
   });
 
