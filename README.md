@@ -22,6 +22,12 @@ examples back into the extraction prompt as few-shot context.
 
 | Audience | Doc | What it covers |
 | --- | --- | --- |
+| AI agents | [`AGENTS.md`](./AGENTS.md) | Quick orientation for AI coding agents. |
+| AI agents | [`.cursor/rules/`](./.cursor/rules/) | Always-on Cursor rules (stack, security, UI, domain, API). |
+| Devs | [`docs/architecture.md`](./docs/architecture.md) | Stack, layout, data flow, crons, env vars. |
+| Devs | [`docs/domain.md`](./docs/domain.md) | Glossary, roles, statuses, mutation map. |
+| Devs | [`docs/data-model.md`](./docs/data-model.md) | `Mrp*` tables (defined in meavo-db). |
+| Devs | [`CONTRIBUTING.md`](./CONTRIBUTING.md) | PR process and code placement. |
 | First-time user | [`docs/accounts-checklist.md`](./docs/accounts-checklist.md) | Every account to create, in order, with cost. |
 | First-time user | [`docs/oauth-setup.md`](./docs/oauth-setup.md) | Google Cloud OAuth client for NextAuth Google SSO. |
 | First-time user | [`docs/domain-setup.md`](./docs/domain-setup.md) | One CNAME record for `stock.yourcompany.bg`. |

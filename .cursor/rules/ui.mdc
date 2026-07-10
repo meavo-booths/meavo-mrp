@@ -1,0 +1,45 @@
+---
+description: Meavo UI standards (desktop + mobile) for meavo-mrp
+globs:
+  - src/app/**
+  - src/components/**
+---
+
+# UI rules — Meavo design system
+
+Org standard (see STANDARDS.md §5 in meavo-agent-templates). Deviations for this repo are listed at the bottom.
+
+## Components
+
+- Use the existing kit in `src/components/ui/` (shadcn/ui new-york style: `badge`, `button`, `card`, `input`, `label`, `select`, `separator`, `textarea`, `toaster`). Add new primitives there via the shadcn pattern — do not introduce MUI or another component library.
+- Header/nav is custom (`src/components/header.tsx`) with `next-intl` `Link` — this repo does not use `@meavo/navigation`.
+
+## Palette & visual language
+
+- MEAVO brand tokens are CSS variables in `src/app/globals.css`: primary green `#0c8f61`, background beige `#faf9f7`, borders `#d7d3cd`, destructive `#c53030`; use the semantic Tailwind tokens (`bg-primary`, `text-muted-foreground`, `border-border`) — never raw hex in components.
+- Delivery-zone colors: `zone-local` / `zone-eu` / `zone-non-eu` tokens.
+- Radius `0.75rem` (`--radius`); dark theme variables exist under `.dark`.
+
+## i18n (required on every component)
+
+- Every user-facing string goes through `next-intl` (`useTranslations` / `getTranslations`); add keys to `messages/bg.json` (source of truth) AND `messages/en.json`.
+- Links/redirects use `Link` / `redirect` from `src/i18n/navigation.ts` — never `next/link` directly, or the locale prefix is lost.
+
+## Responsive (required on every page)
+
+- Mobile-first — the stock team primarily uses phones. Style for narrow viewport, add `sm:` / `lg:` overrides upward.
+- Wide tables must degrade on mobile — stacked cards or `overflow-x-auto`, never clipped columns.
+- Touch targets ≥ 44px; no hover-only affordances for critical actions.
+- Check new pages at 375px and 1280px before opening a PR.
+
+## Rendering
+
+- Server Components by default; `"use client"` only for interactive leaves (forms, upload/scan flows, tables with actions).
+- Authenticated DB-touching pages use `export const dynamic = "force-dynamic"`.
+- This is a PWA — avoid patterns that break offline shell caching (Serwist precache).
+
+## Repo-specific deviations
+
+- shadcn/ui + Radix instead of the org in-house `ui.tsx` kit (approved for this repo).
+- Custom header instead of `@meavo/navigation`.
+- shadcn semantic token palette (MEAVO-branded) instead of `brand-*` / `slate-*` utility classes.
