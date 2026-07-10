@@ -61,6 +61,7 @@
     "balancesTitle": "Наличности",
     "balancesDescription": "Текущи количества по склад (Аксаково по подразбиране за партиди).",
     "balancesEmpty": "Все още няма наличности. Добавете материали и запишете приход или инвентаризация.",
+    "balancesShowingLowest": "Показани са {shown} от {total} наличности — първо най-ниските количества.",
     "colMaterial": "Материал",
     "colWarehouse": "Склад",
     "colQuantity": "Количество",
@@ -92,6 +93,11 @@
       "cancel": "Отказ",
       "bomMissingTitle": "Липсващи материали в ElementBOM",
       "bomMissingDescription": "{count} кода са в ElementBOM, но не са в списъка с материали — добавете ги или импортирайте отново Materials.",
+      "search": "Търси",
+      "searchPlaceholder": "Търсене по код или име",
+      "showingRange": "Показани {from}–{to} от {total}",
+      "pagePrev": "Назад",
+      "pageNext": "Напред",
       "bomMissingLines": "BOM редове"
     },
     "electrics": {
@@ -209,6 +215,7 @@
       "invoiceNumber": "Номер на фактура",
       "notes": "Бележки",
       "submit": "Запиши приход",
+      "success": "Приходът е записан",
       "error": "Грешка при запис"
     },
     "inventory": {

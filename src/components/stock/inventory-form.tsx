@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,41 +20,58 @@ import {
 type WarehouseOption = { id: string; name: string };
 type BatchOption = { id: string; name: string };
 
+export type InventoryFormLabels = {
+  material: string;
+  materialSearchPlaceholder: string;
+  materialUnknown: string;
+  warehouse: string;
+  countDate: string;
+  counted: string;
+  countedThroughBatch: string;
+  countedThroughBatchHint: string;
+  countedThroughBatchManual: string;
+  countedThroughBatchNone: string;
+  notes: string;
+  submit: string;
+  error: string;
+};
+
+/** Entry the form reports back after a successful save, for optimistic history updates. */
+export type RecordedCount = {
+  countDate: string | Date;
+  systemQuantity: string;
+  countedQuantity: string;
+  variance: string;
+  countedThroughBatchLabel: string | null;
+  materialName: string;
+  unit: string;
+  warehouseName: string;
+};
+
 type Props = {
-  materials: MaterialCodeOption[];
   warehouses: WarehouseOption[];
   batches: BatchOption[];
   defaultWarehouseId: string;
-  labels: {
-    material: string;
-    materialSearchPlaceholder: string;
-    materialUnknown: string;
-    warehouse: string;
-    countDate: string;
-    counted: string;
-    countedThroughBatch: string;
-    countedThroughBatchHint: string;
-    countedThroughBatchManual: string;
-    countedThroughBatchNone: string;
-    notes: string;
-    submit: string;
-    error: string;
-  };
+  onRecorded?: (recorded: RecordedCount) => void;
+  labels: InventoryFormLabels;
 };
 
 export function InventoryForm({
-  materials,
   warehouses,
   batches,
   defaultWarehouseId,
+  onRecorded,
   labels,
 }: Props) {
-  const router = useRouter();
   const [materialCode, setMaterialCode] = React.useState("");
   const [materialId, setMaterialId] = React.useState("");
+  const [material, setMaterial] = React.useState<MaterialCodeOption | null>(
+    null,
+  );
   const handleMaterialResolved = React.useCallback(
-    (material: MaterialCodeOption | null) => {
-      setMaterialId(material?.id ?? "");
+    (resolved: MaterialCodeOption | null) => {
+      setMaterialId(resolved?.id ?? "");
+      setMaterial(resolved);
     },
     [],
   );
@@ -104,15 +120,36 @@ export function InventoryForm({
           countedThroughBatchLabel,
         }),
       });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        count?: {
+          countDate: string;
+          systemQuantity: string;
+          countedQuantity: string;
+          variance: string;
+          countedThroughBatchLabel: string | null;
+        };
+      };
       if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
         throw new Error(data.error ?? labels.error);
+      }
+      if (data.count && material) {
+        onRecorded?.({
+          countDate: data.count.countDate,
+          systemQuantity: data.count.systemQuantity,
+          countedQuantity: data.count.countedQuantity,
+          variance: data.count.variance,
+          countedThroughBatchLabel: data.count.countedThroughBatchLabel,
+          materialName: material.name,
+          unit: material.unit ?? "",
+          warehouseName:
+            warehouses.find((w) => w.id === warehouseId)?.name ?? "",
+        });
       }
       setCountedQuantity("");
       setBatchLabel("");
       setNotes("");
       setMaterialCode("");
-      router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : labels.error);
     } finally {
@@ -120,18 +157,9 @@ export function InventoryForm({
     }
   }
 
-  if (materials.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        Add materials first before inventory counts.
-      </p>
-    );
-  }
-
   return (
     <form onSubmit={onSubmit} className="grid max-w-xl gap-4">
       <MaterialCodeField
-        materials={materials}
         value={materialCode}
         onChange={setMaterialCode}
         onResolved={handleMaterialResolved}

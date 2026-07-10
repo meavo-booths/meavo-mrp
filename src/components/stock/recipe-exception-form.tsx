@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useDebouncedValue } from "@/lib/hooks/use-debounced-value";
 import { cn } from "@/lib/utils/cn";
 
 type ModelOption = { id: string; name: string };
@@ -90,7 +91,6 @@ type Labels = {
 type Props = {
   models: ModelOption[];
   batches: BatchOption[];
-  materials: MaterialCodeOption[];
   labels: Labels;
 };
 
@@ -110,7 +110,6 @@ function lineLabel(line: BomLineOption, wildcard: string): string {
 export function RecipeExceptionForm({
   models,
   batches,
-  materials,
   labels,
   onCancel,
 }: Props & { onCancel: () => void }) {
@@ -143,6 +142,8 @@ export function RecipeExceptionForm({
 
   const marketParam =
     scopeMarket === "all" ? undefined : scopeMarket;
+  // Debounced so typing a colour doesn't fire a picker request per keystroke.
+  const debouncedColour = useDebouncedValue(scopeColour.trim(), 300);
 
   React.useEffect(() => {
     if (selectedModelIds.length === 0) {
@@ -155,7 +156,7 @@ export function RecipeExceptionForm({
     const params = new URLSearchParams({
       boothModelIds: selectedModelIds.join(","),
     });
-    if (scopeColour.trim()) params.set("scopeColour", scopeColour.trim());
+    if (debouncedColour) params.set("scopeColour", debouncedColour);
     if (marketParam) params.set("scopeMarket", marketParam);
 
     let cancelled = false;
@@ -171,7 +172,7 @@ export function RecipeExceptionForm({
     return () => {
       cancelled = true;
     };
-  }, [selectedModelIds, scopeColour, marketParam]);
+  }, [selectedModelIds, debouncedColour, marketParam]);
 
   React.useEffect(() => {
     if (!panel || selectedModelIds.length === 0) {
@@ -183,7 +184,7 @@ export function RecipeExceptionForm({
       boothModelIds: selectedModelIds.join(","),
       simpleName: panel,
     });
-    if (scopeColour.trim()) params.set("scopeColour", scopeColour.trim());
+    if (debouncedColour) params.set("scopeColour", debouncedColour);
     if (marketParam) params.set("scopeMarket", marketParam);
 
     let cancelled = false;
@@ -197,7 +198,7 @@ export function RecipeExceptionForm({
     return () => {
       cancelled = true;
     };
-  }, [panel, selectedModelIds, scopeColour, marketParam]);
+  }, [panel, selectedModelIds, debouncedColour, marketParam]);
 
   function toggleModel(id: string) {
     setSelectedModelIds((prev) =>
@@ -411,7 +412,6 @@ export function RecipeExceptionForm({
           {replacements.map((row, index) => (
             <ReplacementRowFields
               key={row.key}
-              materials={materials}
               row={row}
               labels={labels}
               onChange={(next) =>
@@ -571,14 +571,12 @@ export function RecipeExceptionForm({
 }
 
 function ReplacementRowFields({
-  materials,
   row,
   labels,
   onChange,
   onRemove,
   quantityId,
 }: {
-  materials: MaterialCodeOption[];
   row: ReplacementRow;
   labels: Labels;
   onChange: (row: ReplacementRow) => void;
@@ -586,7 +584,9 @@ function ReplacementRowFields({
   quantityId: string;
 }) {
   const rowRef = React.useRef(row);
-  rowRef.current = row;
+  React.useEffect(() => {
+    rowRef.current = row;
+  });
 
   const handleResolved = React.useCallback((material: MaterialCodeOption | null) => {
     const nextId = material?.id ?? "";
@@ -607,7 +607,6 @@ function ReplacementRowFields({
     <div className="flex flex-wrap items-end gap-2">
       <div className="min-w-[14rem] flex-1">
         <MaterialCodeField
-          materials={materials}
           value={row.materialQuery}
           onChange={(q) => {
             if (q === rowRef.current.materialQuery && !rowRef.current.materialId) return;

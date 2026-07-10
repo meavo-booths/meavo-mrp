@@ -11,7 +11,8 @@ const withSerwist = withSerwistInit({
   swDest: "public/sw.js",
   // Disable PWA in dev to avoid noisy reloads.
   disable: isDev,
-  cacheOnNavigation: true,
+  // Authenticated force-dynamic pages must not serve stale cached HTML.
+  cacheOnNavigation: false,
   reloadOnOnline: true,
 });
 

@@ -1,5 +1,7 @@
 import "server-only";
 
+import { cache } from "react";
+
 import { redirect } from "next/navigation";
 
 import { auth } from "@/lib/auth";
@@ -19,8 +21,9 @@ export type SessionUser = {
  * Returns the current NextAuth session user (gateway `User.id`) with the MRP
  * role from `MrpUserProfile`, or null if not signed in.
  * Use in Server Components / Route Handlers.
+ * Wrapped in `React.cache` so layout + page share one DB lookup per request.
  */
-export async function getSessionUser(): Promise<SessionUser | null> {
+export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
   const session = await auth();
   const id = session?.user?.id;
   if (!id) return null;
@@ -43,7 +46,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
     avatarUrl: user.image,
     role: user.mrpProfile?.role ?? "scanner",
   };
-}
+});
 
 /** Redirect to login if not signed in. Returns a guaranteed-non-null user. */
 export async function requireSessionUser(

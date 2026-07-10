@@ -66,11 +66,18 @@ export default async function LocaleLayout({
 
   setRequestLocale(locale as Locale);
   const messages = await getMessages();
+  // Only the namespaces used by client components ship to the browser;
+  // server components read the full catalog via getTranslations().
+  const clientMessages = {
+    nav: messages.nav,
+    common: messages.common,
+    deliveryZone: messages.deliveryZone,
+  };
 
   return (
     <html lang={locale} className={`${instrumentSans.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
-        <NextIntlClientProvider messages={messages} locale={locale}>
+        <NextIntlClientProvider messages={clientMessages} locale={locale}>
           {children}
           <Toaster />
         </NextIntlClientProvider>

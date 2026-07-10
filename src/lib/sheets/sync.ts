@@ -9,6 +9,7 @@ import {
   findSpreadsheetIdByBatchName,
 } from "@/lib/google/sheets-client";
 import { prisma } from "@/lib/prisma";
+import { syncBomMissingFromMasterSheet } from "@/lib/stock/bom-missing";
 import { ensureStockReferenceData } from "@/lib/stock/seed";
 import { postElementDeductions } from "@/lib/sheets/deductions";
 import { parseAllMasterBatches, type ParsedMasterBatch } from "@/lib/sheets/master-status";
@@ -188,6 +189,14 @@ async function upsertMasterBatch(
   });
 }
 
+function decimalEquals(
+  a: { toString(): string } | null,
+  b: string | null,
+): boolean {
+  if (a === null || b === null) return a === null && b === null;
+  return Number(a.toString()) === Number(b);
+}
+
 async function syncBatchPackingTab(
   batch: MrpManufacturingBatch,
   units: ParsedOpakovaneUnit[],
@@ -209,83 +218,169 @@ async function syncBatchPackingTab(
     existingUnits.map((unit) => [unit.sheetRowIndex, unit]),
   );
 
+  // Diff sheet state against the DB in memory; only changed rows get writes.
+  const parsedRowIndices = new Set(units.map((unit) => unit.sheetRowIndex));
+  const unitIdsToDelete = existingUnits
+    .filter((unit) => !parsedRowIndices.has(unit.sheetRowIndex))
+    .map((unit) => unit.id);
+
+  const unitsToCreate: ParsedOpakovaneUnit[] = [];
+  const unitUpdates: Array<{
+    id: string;
+    data: {
+      boothIdText: string | null;
+      colour: string | null;
+      progressPct: string | null;
+    };
+  }> = [];
+
+  type ElementCreate = {
+    sheetRowIndex: number;
+    boothElementId: string;
+    isComplete: boolean;
+    completedAt: Date | null;
+  };
+  const elementCreates: ElementCreate[] = [];
+  const elementIdsToComplete: string[] = [];
+  const elementIdsToUncomplete: string[] = [];
+  const elementIdsMissingCompletedAt: string[] = [];
+  const newlyCompletedIds: string[] = [];
+
   let unitsUpserted = 0;
   let elementsUpserted = 0;
-  const newlyCompletedIds: string[] = [];
+  const now = new Date();
+
+  for (const unit of units) {
+    const existingUnit = existingByRow.get(unit.sheetRowIndex);
+    unitsUpserted++;
+
+    if (!existingUnit) {
+      unitsToCreate.push(unit);
+    } else if (
+      existingUnit.boothIdText !== unit.boothIdText ||
+      existingUnit.colour !== unit.colour ||
+      !decimalEquals(existingUnit.progressPct, unit.progressPct)
+    ) {
+      unitUpdates.push({
+        id: existingUnit.id,
+        data: {
+          boothIdText: unit.boothIdText,
+          colour: unit.colour,
+          progressPct: unit.progressPct,
+        },
+      });
+    }
+
+    const existingElements = new Map(
+      (existingUnit?.elements ?? []).map((element) => [
+        element.boothElementId,
+        element,
+      ]),
+    );
+
+    for (const element of unit.elements) {
+      const boothElementId = headerToElementId.get(element.sheetHeader);
+      if (!boothElementId) continue;
+      elementsUpserted++;
+
+      const existing = existingElements.get(boothElementId);
+      const isComplete = element.isComplete;
+
+      if (!existing) {
+        elementCreates.push({
+          sheetRowIndex: unit.sheetRowIndex,
+          boothElementId,
+          isComplete,
+          completedAt: isComplete ? now : null,
+        });
+        continue;
+      }
+
+      const wasComplete = existing.isComplete;
+      if (isComplete && !wasComplete) {
+        elementIdsToComplete.push(existing.id);
+        if (!existing.deductionPosted) {
+          newlyCompletedIds.push(existing.id);
+        }
+      } else if (!isComplete && wasComplete) {
+        elementIdsToUncomplete.push(existing.id);
+      } else if (isComplete && existing.completedAt === null) {
+        elementIdsMissingCompletedAt.push(existing.id);
+      }
+    }
+  }
 
   await prisma.$transaction(
     async (tx) => {
-      const parsedRowIndices = new Set(units.map((unit) => unit.sheetRowIndex));
+      if (unitIdsToDelete.length > 0) {
+        // Elements cascade via the schema relation.
+        await tx.mrpBatchUnit.deleteMany({
+          where: { id: { in: unitIdsToDelete } },
+        });
+      }
 
-      for (const existing of existingUnits) {
-        if (!parsedRowIndices.has(existing.sheetRowIndex)) {
-          await tx.mrpBatchUnit.delete({ where: { id: existing.id } });
+      const unitIdByRow = new Map<number, string>();
+      if (unitsToCreate.length > 0) {
+        const created = await tx.mrpBatchUnit.createManyAndReturn({
+          data: unitsToCreate.map((unit) => ({
+            manufacturingBatchId: batch.id,
+            sheetRowIndex: unit.sheetRowIndex,
+            boothIdText: unit.boothIdText,
+            colour: unit.colour,
+            progressPct: unit.progressPct,
+          })),
+          select: { id: true, sheetRowIndex: true },
+        });
+        for (const unit of created) {
+          unitIdByRow.set(unit.sheetRowIndex, unit.id);
         }
       }
 
-      for (const unit of units) {
-        const existingUnit = existingByRow.get(unit.sheetRowIndex);
-        const batchUnit = existingUnit
-          ? await tx.mrpBatchUnit.update({
-              where: { id: existingUnit.id },
-              data: {
-                boothIdText: unit.boothIdText,
-                colour: unit.colour,
-                progressPct: unit.progressPct,
+      for (const update of unitUpdates) {
+        await tx.mrpBatchUnit.update({
+          where: { id: update.id },
+          data: update.data,
+        });
+      }
+
+      if (elementCreates.length > 0) {
+        await tx.mrpBatchUnitElement.createMany({
+          data: elementCreates.flatMap((element) => {
+            const batchUnitId =
+              unitIdByRow.get(element.sheetRowIndex) ??
+              existingByRow.get(element.sheetRowIndex)?.id;
+            if (!batchUnitId) return [];
+            return [
+              {
+                batchUnitId,
+                boothElementId: element.boothElementId,
+                isComplete: element.isComplete,
+                completedAt: element.completedAt,
+                // Pre-completed elements never deduct (bootstrap rule).
+                deductionPosted: element.isComplete,
               },
-            })
-          : await tx.mrpBatchUnit.create({
-              data: {
-                manufacturingBatchId: batch.id,
-                sheetRowIndex: unit.sheetRowIndex,
-                boothIdText: unit.boothIdText,
-                colour: unit.colour,
-                progressPct: unit.progressPct,
-              },
-            });
-        unitsUpserted++;
+            ];
+          }),
+        });
+      }
 
-        const existingElements = new Map(
-          (existingUnit?.elements ?? []).map((element) => [
-            element.boothElementId,
-            element,
-          ]),
-        );
-
-        for (const element of unit.elements) {
-          const boothElementId = headerToElementId.get(element.sheetHeader);
-          if (!boothElementId) continue;
-
-          const existing = existingElements.get(boothElementId);
-          const wasComplete = existing?.isComplete ?? false;
-          const isComplete = element.isComplete;
-          const completedAt =
-            isComplete && !wasComplete
-              ? new Date()
-              : isComplete
-                ? (existing?.completedAt ?? new Date())
-                : null;
-
-          const saved = existing
-            ? await tx.mrpBatchUnitElement.update({
-                where: { id: existing.id },
-                data: { isComplete, completedAt },
-              })
-            : await tx.mrpBatchUnitElement.create({
-                data: {
-                  batchUnitId: batchUnit.id,
-                  boothElementId,
-                  isComplete,
-                  completedAt,
-                  deductionPosted: isComplete,
-                },
-              });
-          elementsUpserted++;
-
-          if (existing && isComplete && !wasComplete && !saved.deductionPosted) {
-            newlyCompletedIds.push(saved.id);
-          }
-        }
+      if (elementIdsToComplete.length > 0) {
+        await tx.mrpBatchUnitElement.updateMany({
+          where: { id: { in: elementIdsToComplete } },
+          data: { isComplete: true, completedAt: now },
+        });
+      }
+      if (elementIdsToUncomplete.length > 0) {
+        await tx.mrpBatchUnitElement.updateMany({
+          where: { id: { in: elementIdsToUncomplete } },
+          data: { isComplete: false, completedAt: null },
+        });
+      }
+      if (elementIdsMissingCompletedAt.length > 0) {
+        await tx.mrpBatchUnitElement.updateMany({
+          where: { id: { in: elementIdsMissingCompletedAt } },
+          data: { completedAt: now },
+        });
       }
     },
     { timeout: 60_000 },
@@ -420,6 +515,15 @@ export async function runSheetSync(): Promise<SheetSyncResult> {
     });
     deductionsPosted = deduction.posted;
     errors.push(...deduction.errors);
+
+    // Refresh the BOM-missing materials cache (previously done on materials page render).
+    try {
+      await syncBomMissingFromMasterSheet();
+    } catch (err) {
+      warnings.push(
+        `BOM missing refresh: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
 
     await prisma.mrpSheetSyncLog.update({
       where: { id: log.id },

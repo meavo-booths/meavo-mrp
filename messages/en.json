@@ -61,6 +61,7 @@
     "balancesTitle": "On-hand stock",
     "balancesDescription": "Current quantities per warehouse (Aksakovo default for batches).",
     "balancesEmpty": "No balances yet. Add materials, then record a receipt or inventory count.",
+    "balancesShowingLowest": "Showing {shown} of {total} balances — lowest quantities first.",
     "colMaterial": "Material",
     "colWarehouse": "Warehouse",
     "colQuantity": "Quantity",
@@ -90,6 +91,11 @@
       "edit": "Edit",
       "save": "Save",
       "cancel": "Cancel",
+      "search": "Search",
+      "searchPlaceholder": "Search by code or name",
+      "showingRange": "Showing {from}–{to} of {total}",
+      "pagePrev": "Previous",
+      "pageNext": "Next",
       "bomMissingTitle": "Materials missing from master list",
       "bomMissingDescription": "{count} code(s) appear in ElementBOM but are not in Materials — add them or re-import Materials.",
       "bomMissingLines": "BOM lines"
@@ -209,6 +215,7 @@
       "invoiceNumber": "Invoice number",
       "notes": "Notes",
       "submit": "Save receipt",
+      "success": "Receipt saved",
       "error": "Save failed"
     },
     "inventory": {

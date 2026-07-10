@@ -1,9 +1,13 @@
 import { setRequestLocale, getTranslations } from "next-intl/server";
+import type { Prisma } from "@prisma/client";
 
+import { Link } from "@/i18n/navigation";
 import { BomMissingMaterialsBanner } from "@/components/stock/bom-missing-banner";
 import { CsvDataPanel } from "@/components/stock/csv-data-panel";
 import { MaterialForm } from "@/components/stock/material-form";
-import { MaterialRow } from "@/components/stock/material-row";
+import { MaterialsList } from "@/components/stock/materials-list";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Card,
   CardContent,
@@ -13,15 +17,19 @@ import {
 } from "@/components/ui/card";
 import { prisma } from "@/lib/prisma";
 import { requireSessionUser } from "@/lib/auth/session";
-import { refreshBomMissingMaterialsForUi } from "@/lib/stock/bom-missing";
+import { listBomMissingMaterials } from "@/lib/stock/bom-missing";
 import { ensureStockReferenceData } from "@/lib/stock";
 
 export const dynamic = "force-dynamic";
 
+const PAGE_SIZE = 100;
+
 export default async function MaterialsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string }>;
+  searchParams: Promise<{ q?: string; page?: string }>;
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
@@ -30,18 +38,53 @@ export default async function MaterialsPage({
 
   const t = await getTranslations("stock.materials");
   const tc = await getTranslations("stock.csv");
-  const [materialRows, bomMissing] = await Promise.all([
-    prisma.mrpMaterial.findMany({
-      where: { isActive: true },
-      orderBy: { code: "asc" },
-    }),
-    refreshBomMissingMaterialsForUi(),
+
+  const { q: rawQuery, page: rawPage } = await searchParams;
+  const q = rawQuery?.trim() ?? "";
+  const requestedPage = Math.max(1, Number(rawPage) || 1);
+
+  const where: Prisma.MrpMaterialWhereInput = {
+    isActive: true,
+    ...(q
+      ? {
+          OR: [
+            { code: { contains: q } },
+            { name: { contains: q, mode: "insensitive" } },
+          ],
+        }
+      : {}),
+  };
+
+  const [total, bomMissing] = await Promise.all([
+    prisma.mrpMaterial.count({ where }),
+    listBomMissingMaterials(),
   ]);
+
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const page = Math.min(requestedPage, pageCount);
+
+  const materialRows = await prisma.mrpMaterial.findMany({
+    where,
+    select: {
+      id: true,
+      code: true,
+      name: true,
+      unit: true,
+      unitPriceEur: true,
+      currentQuantity: true,
+    },
+    orderBy: { code: "asc" },
+    skip: (page - 1) * PAGE_SIZE,
+    take: PAGE_SIZE,
+  });
   const materials = materialRows.map((m) => ({
     ...m,
     unitPriceEur: m.unitPriceEur?.toString() ?? null,
     currentQuantity: m.currentQuantity.toString(),
   }));
+
+  const from = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const to = (page - 1) * PAGE_SIZE + materials.length;
 
   const csvLabels = {
     title: tc("materialsTitle"),
@@ -103,29 +146,71 @@ export default async function MaterialsPage({
             <CardDescription>{t("listDescription")}</CardDescription>
           </CardHeader>
           <CardContent>
+            <form method="get" className="mb-4 flex gap-2">
+              <Input
+                type="search"
+                name="q"
+                defaultValue={q}
+                placeholder={t("searchPlaceholder")}
+                aria-label={t("searchPlaceholder")}
+              />
+              <Button type="submit" variant="outline">
+                {t("search")}
+              </Button>
+            </form>
+
             {materials.length === 0 ? (
               <p className="text-sm text-muted-foreground">{t("empty")}</p>
             ) : (
-              <ul>
-                {materials.map((m) => (
-                  <MaterialRow
-                    key={m.id}
-                    material={m}
-                    locale={locale}
-                    labels={{
-                      edit: t("edit"),
-                      save: t("save"),
-                      cancel: t("cancel"),
-                      code: t("code"),
-                      name: t("name"),
-                      unit: t("unit"),
-                      unitPrice: t("unitPrice"),
-                      error: t("error"),
-                    }}
-                  />
-                ))}
-              </ul>
+              <MaterialsList
+                materials={materials}
+                locale={locale}
+                labels={{
+                  edit: t("edit"),
+                  save: t("save"),
+                  cancel: t("cancel"),
+                  code: t("code"),
+                  name: t("name"),
+                  unit: t("unit"),
+                  unitPrice: t("unitPrice"),
+                  error: t("error"),
+                }}
+              />
             )}
+
+            {total > PAGE_SIZE ? (
+              <div className="mt-4 flex items-center justify-between gap-2 text-sm">
+                <p className="text-muted-foreground">
+                  {t("showingRange", { from, to, total })}
+                </p>
+                <div className="flex gap-2">
+                  {page > 1 ? (
+                    <Button asChild variant="outline" size="sm">
+                      <Link
+                        href={{
+                          pathname: "/materials",
+                          query: { ...(q ? { q } : {}), page: page - 1 },
+                        }}
+                      >
+                        {t("pagePrev")}
+                      </Link>
+                    </Button>
+                  ) : null}
+                  {page < pageCount ? (
+                    <Button asChild variant="outline" size="sm">
+                      <Link
+                        href={{
+                          pathname: "/materials",
+                          query: { ...(q ? { q } : {}), page: page + 1 },
+                        }}
+                      >
+                        {t("pageNext")}
+                      </Link>
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
           </CardContent>
         </Card>
       </div>

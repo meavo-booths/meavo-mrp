@@ -26,5 +26,5 @@ export async function POST(request: Request) {
     requestedBy: user.id,
   });
 
-  return NextResponse.json(result, { status: result.ok ? 200 : 500 });
+  return NextResponse.json(result, { status: 202 });
 }

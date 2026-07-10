@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/card";
 import { prisma } from "@/lib/prisma";
 import { requireSessionUser } from "@/lib/auth/session";
-import { ensureStockReferenceData, getDefaultWarehouseId } from "@/lib/stock";
+import { getDefaultWarehouseId } from "@/lib/stock";
 
 export const dynamic = "force-dynamic";
 
@@ -22,23 +22,15 @@ export default async function ReceiptPage({
   const { locale } = await params;
   setRequestLocale(locale);
   await requireSessionUser();
-  await ensureStockReferenceData();
 
   const t = await getTranslations("stock.receipt");
   const defaultWarehouseId = await getDefaultWarehouseId();
 
-  const [materials, warehouses] = await Promise.all([
-    prisma.mrpMaterial.findMany({
-      where: { isActive: true },
-      select: { id: true, name: true, unit: true, code: true },
-      orderBy: { name: "asc" },
-    }),
-    prisma.mrpWarehouse.findMany({
-      where: { isActive: true },
-      select: { id: true, name: true, code: true },
-      orderBy: { name: "asc" },
-    }),
-  ]);
+  const warehouses = await prisma.mrpWarehouse.findMany({
+    where: { isActive: true },
+    select: { id: true, name: true, code: true },
+    orderBy: { name: "asc" },
+  });
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-8">
@@ -53,7 +45,6 @@ export default async function ReceiptPage({
         </CardHeader>
         <CardContent>
           <ReceiptForm
-            materials={materials}
             warehouses={warehouses}
             defaultWarehouseId={defaultWarehouseId}
             labels={{
@@ -66,6 +57,7 @@ export default async function ReceiptPage({
               invoiceNumber: t("invoiceNumber"),
               notes: t("notes"),
               submit: t("submit"),
+              success: t("success"),
               error: t("error"),
             }}
           />

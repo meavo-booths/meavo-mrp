@@ -1,6 +1,6 @@
-export { applyMovement } from "./movements";
+export { applyMovement, applyMovements } from "./movements";
 export { recordInventoryCount } from "./inventory";
-export { listBalances } from "./balances";
+export { listBalances, getBalanceStats } from "./balances";
 export {
   deriveBoothMarket,
   resolveBomLines,

@@ -1,19 +1,11 @@
 import { setRequestLocale, getTranslations } from "next-intl/server";
 
 import { CsvDataPanel } from "@/components/stock/csv-data-panel";
-import { InventoryForm } from "@/components/stock/inventory-form";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { InventoryPanel } from "@/components/stock/inventory-panel";
 import { prisma } from "@/lib/prisma";
 import { requireSessionUser } from "@/lib/auth/session";
-import { ensureStockReferenceData, getDefaultWarehouseId } from "@/lib/stock";
+import { getDefaultWarehouseId } from "@/lib/stock";
 import { listManufacturingBatchOptions } from "@/lib/stock/inventory-batch";
-import { formatDate, formatQuantity } from "@/lib/utils/format";
 
 export const dynamic = "force-dynamic";
 
@@ -25,18 +17,12 @@ export default async function InventoryPage({
   const { locale } = await params;
   setRequestLocale(locale);
   await requireSessionUser();
-  await ensureStockReferenceData();
 
   const t = await getTranslations("stock.inventory");
   const tc = await getTranslations("stock.csv");
   const defaultWarehouseId = await getDefaultWarehouseId();
 
-  const [materials, warehouses, batches, recentCountRows] = await Promise.all([
-    prisma.mrpMaterial.findMany({
-      where: { isActive: true },
-      select: { id: true, name: true, code: true },
-      orderBy: { name: "asc" },
-    }),
+  const [warehouses, batches, recentCountRows] = await Promise.all([
     prisma.mrpWarehouse.findMany({
       where: { isActive: true },
       select: { id: true, name: true },
@@ -96,88 +82,34 @@ export default async function InventoryPage({
         />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>{t("formTitle")}</CardTitle>
-            <CardDescription>{t("formDescription")}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <InventoryForm
-              materials={materials}
-              warehouses={warehouses}
-              batches={batches}
-              defaultWarehouseId={defaultWarehouseId}
-            labels={{
-              material: t("material"),
-              materialSearchPlaceholder: t("materialSearchPlaceholder"),
-              materialUnknown: t("materialUnknown"),
-              warehouse: t("warehouse"),
-                countDate: t("countDate"),
-                counted: t("counted"),
-                countedThroughBatch: t("countedThroughBatch"),
-                countedThroughBatchHint: t("countedThroughBatchHint"),
-                countedThroughBatchManual: t("countedThroughBatchManual"),
-                countedThroughBatchNone: t("countedThroughBatchNone"),
-                notes: t("notes"),
-                submit: t("submit"),
-                error: t("error"),
-              }}
-            />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>{t("historyTitle")}</CardTitle>
-            <CardDescription>{t("historyDescription")}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {recentCounts.length === 0 ? (
-              <p className="text-sm text-muted-foreground">{t("historyEmpty")}</p>
-            ) : (
-              <ul className="divide-y text-sm">
-                {recentCounts.map((row, i) => (
-                  <li key={i} className="space-y-1 py-3">
-                    <div className="flex justify-between gap-2">
-                      <span className="font-medium">{row.materialName}</span>
-                      <span className="text-muted-foreground">
-                        {formatDate(row.countDate, locale)}
-                      </span>
-                    </div>
-                    <p className="text-muted-foreground">{row.warehouseName}</p>
-                    {row.countedThroughBatchLabel ? (
-                      <p className="text-muted-foreground">
-                        {t("countedThroughBatch")}: {row.countedThroughBatchLabel}
-                      </p>
-                    ) : null}
-                    <p>
-                      {t("counted")}:{" "}
-                      {formatQuantity(row.countedQuantity, locale, row.unit)}
-                      {Number(row.systemQuantity) !== 0 &&
-                      Number(row.variance) !== 0 ? (
-                        <>
-                          {" · "}
-                          {t("variance")}:{" "}
-                          <span
-                            className={
-                              Number(row.variance) < 0
-                                ? "text-destructive"
-                                : "text-green-600"
-                            }
-                          >
-                            {formatQuantity(row.variance, locale, row.unit)}
-                          </span>
-                        </>
-                      ) : null}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+      <InventoryPanel
+        warehouses={warehouses}
+        batches={batches}
+        defaultWarehouseId={defaultWarehouseId}
+        initialCounts={recentCounts}
+        locale={locale}
+        labels={{
+          formTitle: t("formTitle"),
+          formDescription: t("formDescription"),
+          historyTitle: t("historyTitle"),
+          historyDescription: t("historyDescription"),
+          historyEmpty: t("historyEmpty"),
+          variance: t("variance"),
+          material: t("material"),
+          materialSearchPlaceholder: t("materialSearchPlaceholder"),
+          materialUnknown: t("materialUnknown"),
+          warehouse: t("warehouse"),
+          countDate: t("countDate"),
+          counted: t("counted"),
+          countedThroughBatch: t("countedThroughBatch"),
+          countedThroughBatchHint: t("countedThroughBatchHint"),
+          countedThroughBatchManual: t("countedThroughBatchManual"),
+          countedThroughBatchNone: t("countedThroughBatchNone"),
+          notes: t("notes"),
+          submit: t("submit"),
+          error: t("error"),
+        }}
+      />
     </div>
   );
 }

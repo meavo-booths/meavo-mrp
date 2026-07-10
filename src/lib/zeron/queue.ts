@@ -1,17 +1,18 @@
 import "server-only";
 
+import { after } from "next/server";
 import { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { getZeronAdapter } from "./factory";
 
 /**
- * Run a sync attempt for a document. Records every attempt in `sync_attempts`
- * (the previous "current" attempt is demoted) and updates the document
- * status to `synced` or `sync_failed`.
+ * Queue a sync attempt for a document and return immediately.
  *
- * Designed to be called from `/api/documents/[id]/approve` (fire-and-forget)
- * or from the admin retry button.
+ * The attempt row is committed as `queued` before the response is sent (so
+ * work is never silently dropped), and the actual adapter push runs via
+ * `after()` once the response has flushed — approve/retry requests no longer
+ * block on the adapter.
  */
 export async function enqueueZeronSync(opts: {
   documentId: string;
@@ -20,19 +21,43 @@ export async function enqueueZeronSync(opts: {
   const { documentId } = opts;
   const adapter = getZeronAdapter();
 
-  // Mark older attempts as not-current.
-  await prisma.mrpSyncAttempt.updateMany({
-    where: { documentId, isCurrent: true },
-    data: { isCurrent: false },
+  const attempt = await prisma.$transaction(async (tx) => {
+    // Mark older attempts as not-current.
+    await tx.mrpSyncAttempt.updateMany({
+      where: { documentId, isCurrent: true },
+      data: { isCurrent: false },
+    });
+
+    return tx.mrpSyncAttempt.create({
+      data: {
+        documentId,
+        adapter: adapter.name,
+        status: "queued",
+        isCurrent: true,
+      },
+    });
   });
 
-  const attempt = await prisma.mrpSyncAttempt.create({
-    data: {
-      documentId,
-      adapter: adapter.name,
-      status: "running",
-      isCurrent: true,
-    },
+  after(() => processZeronSyncAttempt(attempt.id));
+
+  return { ok: true, queued: true, attemptId: attempt.id };
+}
+
+/** Run one queued sync attempt: push to the adapter and record the outcome. */
+export async function processZeronSyncAttempt(attemptId: string) {
+  const attempt = await prisma.mrpSyncAttempt.findUnique({
+    where: { id: attemptId },
+  });
+  if (!attempt || attempt.status !== "queued") {
+    return { ok: false, error: "Attempt not found or already processed" };
+  }
+
+  const { documentId } = attempt;
+  const adapter = getZeronAdapter();
+
+  await prisma.mrpSyncAttempt.update({
+    where: { id: attemptId },
+    data: { status: "running" },
   });
 
   try {
@@ -59,7 +84,7 @@ export async function enqueueZeronSync(opts: {
     });
 
     await prisma.mrpSyncAttempt.update({
-      where: { id: attempt.id },
+      where: { id: attemptId },
       data: {
         status: "succeeded",
         response: (result.raw ?? {
@@ -82,7 +107,7 @@ export async function enqueueZeronSync(opts: {
   } catch (e) {
     const error = (e as Error).message;
     await prisma.mrpSyncAttempt.update({
-      where: { id: attempt.id },
+      where: { id: attemptId },
       data: {
         status: "failed",
         error,

@@ -4,12 +4,14 @@ import * as React from "react";
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useDebouncedValue } from "@/lib/hooks/use-debounced-value";
 import { cn } from "@/lib/utils/cn";
 
 export type MaterialCodeOption = {
   id: string;
   code: string | null;
   name: string;
+  unit?: string;
 };
 
 type Labels = {
@@ -19,7 +21,6 @@ type Labels = {
 };
 
 type Props = {
-  materials: MaterialCodeOption[];
   value: string;
   onChange: (query: string) => void;
   onResolved: (material: MaterialCodeOption | null) => void;
@@ -97,7 +98,6 @@ function formatMaterialLabel(material: MaterialCodeOption): string {
 }
 
 export function MaterialCodeField({
-  materials,
   value,
   onChange,
   onResolved,
@@ -109,24 +109,65 @@ export function MaterialCodeField({
   const [open, setOpen] = React.useState(false);
   const [highlightIndex, setHighlightIndex] = React.useState(0);
   const [selected, setSelected] = React.useState<MaterialCodeOption | null>(null);
+  const [searchResult, setSearchResult] = React.useState<{
+    query: string;
+    materials: MaterialCodeOption[];
+  }>({ query: "", materials: [] });
+
+  // Suggestions come from a debounced server search instead of a client-side
+  // scan of the full catalog (which used to be serialized into every page).
+  const debouncedQuery = useDebouncedValue(value.trim(), 200);
+  const selectedLabel = selected ? formatMaterialLabel(selected) : null;
+  const shouldSearch = Boolean(debouncedQuery) && debouncedQuery !== selectedLabel;
+
+  React.useEffect(() => {
+    if (!shouldSearch) return;
+
+    const controller = new AbortController();
+    fetch(`/api/materials/search?q=${encodeURIComponent(debouncedQuery)}`, {
+      signal: controller.signal,
+    })
+      .then((res) => (res.ok ? res.json() : { materials: [] }))
+      .then((data: { materials?: MaterialCodeOption[] }) => {
+        setSearchResult({ query: debouncedQuery, materials: data.materials ?? [] });
+      })
+      .catch((err: unknown) => {
+        // Aborted requests are superseded; anything else resolves to no results.
+        if (!(err instanceof DOMException && err.name === "AbortError")) {
+          setSearchResult({ query: debouncedQuery, materials: [] });
+        }
+      });
+    return () => controller.abort();
+  }, [shouldSearch, debouncedQuery]);
+
+  const options = React.useMemo(
+    () =>
+      shouldSearch && searchResult.query === debouncedQuery
+        ? searchResult.materials
+        : [],
+    [shouldSearch, searchResult, debouncedQuery],
+  );
+  const searching = shouldSearch && searchResult.query !== debouncedQuery;
 
   const isCodeQuery = /^\d+$/.test(value.trim());
   const codeMatch = React.useMemo(
-    () => (isCodeQuery ? resolveMaterialByCode(materials, value) : null),
-    [materials, value, isCodeQuery],
+    () => (isCodeQuery ? resolveMaterialByCode(options, value) : null),
+    [options, value, isCodeQuery],
   );
 
   const suggestions = React.useMemo(() => {
     if (!value.trim() || codeMatch) return [];
-    return filterMaterialSuggestions(materials, value);
-  }, [materials, value, codeMatch]);
+    return filterMaterialSuggestions(options, value);
+  }, [options, value, codeMatch]);
 
   const resolved = selected ?? codeMatch;
   const resolvedId = resolved?.id ?? null;
   const onResolvedRef = React.useRef(onResolved);
   const prevResolvedIdRef = React.useRef<string | null | undefined>(undefined);
 
-  onResolvedRef.current = onResolved;
+  React.useEffect(() => {
+    onResolvedRef.current = onResolved;
+  });
 
   React.useEffect(() => {
     if (prevResolvedIdRef.current === resolvedId) return;
@@ -134,15 +175,17 @@ export function MaterialCodeField({
     onResolvedRef.current(resolved);
   }, [resolved, resolvedId]);
 
-  React.useEffect(() => {
+  // Reset highlight when the visible list changes (adjust-state-during-render pattern).
+  const listKey = `${value}\u0000${suggestions.length}`;
+  const [prevListKey, setPrevListKey] = React.useState(listKey);
+  if (listKey !== prevListKey) {
+    setPrevListKey(listKey);
     setHighlightIndex(0);
-  }, [value, suggestions.length]);
+  }
 
-  React.useEffect(() => {
-    if (!value.trim()) {
-      setSelected(null);
-    }
-  }, [value]);
+  if (!value.trim() && selected !== null) {
+    setSelected(null);
+  }
 
   React.useEffect(() => {
     function onPointerDown(e: MouseEvent) {
@@ -166,14 +209,21 @@ export function MaterialCodeField({
     setOpen(true);
   }
 
+  const pendingSearch =
+    searching || (Boolean(value.trim()) && value.trim() !== debouncedQuery);
   const showSuggestions = open && suggestions.length > 0 && !codeMatch;
   const showUnknown =
     value.trim().length > 0 &&
     !resolved &&
     !showSuggestions &&
+    !pendingSearch &&
     !isCodeQuery;
   const showCodeUnknown =
-    isCodeQuery && value.trim().length > 0 && !codeMatch && suggestions.length === 0;
+    isCodeQuery &&
+    value.trim().length > 0 &&
+    !codeMatch &&
+    !pendingSearch &&
+    suggestions.length === 0;
 
   return (
     <div ref={rootRef} className={cn("relative space-y-2", className)}>

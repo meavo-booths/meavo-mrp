@@ -40,7 +40,15 @@ export async function importMaterialsCsv(
   const { headers, rows } = parseCsv(text);
   const objects = rowsToObjects(headers, rows);
 
-  const importedCodes: string[] = [];
+  type ParsedRow = {
+    rowNum: number;
+    code: string;
+    name: string | null;
+    unit: string | null;
+    unitPriceEur: string | null;
+    hasPrice: boolean;
+  };
+  const parsedRows: ParsedRow[] = [];
 
   for (let i = 0; i < objects.length; i++) {
     const rowNum = i + 2;
@@ -49,38 +57,14 @@ export async function importMaterialsCsv(
     if (!code) continue;
 
     try {
-      const name = raw.name?.trim() || code;
-      const unit = raw.unit?.trim() || "бр";
-      const unitPriceEur = parseOptionalPrice(raw.unit_price_eur ?? "");
-
-      const existing = await prisma.mrpMaterial.findUnique({
-        where: { code },
+      parsedRows.push({
+        rowNum,
+        code,
+        name: raw.name?.trim() || null,
+        unit: raw.unit?.trim() || null,
+        unitPriceEur: parseOptionalPrice(raw.unit_price_eur ?? ""),
+        hasPrice: Boolean(raw.unit_price_eur?.trim()),
       });
-
-      if (existing) {
-        await prisma.mrpMaterial.update({
-          where: { id: existing.id },
-          data: {
-            name: raw.name?.trim() ? name : existing.name,
-            unit: raw.unit?.trim() ? unit : existing.unit,
-            unitPriceEur:
-              raw.unit_price_eur?.trim() ? unitPriceEur : existing.unitPriceEur,
-            updatedAt: new Date(),
-          },
-        });
-        result.updated++;
-      } else {
-        await prisma.mrpMaterial.create({
-          data: {
-            code,
-            name,
-            unit,
-            unitPriceEur,
-          },
-        });
-        result.created++;
-      }
-      importedCodes.push(code);
     } catch (err) {
       result.ok = false;
       result.errors.push({
@@ -88,6 +72,95 @@ export async function importMaterialsCsv(
         message: err instanceof Error ? err.message : String(err),
       });
     }
+  }
+
+  if (parsedRows.length === 0) return result;
+
+  // One lookup for all codes instead of a query per row.
+  const existingRows = await prisma.mrpMaterial.findMany({
+    where: { code: { in: [...new Set(parsedRows.map((r) => r.code))] } },
+    select: { id: true, code: true, name: true, unit: true, unitPriceEur: true },
+  });
+  const existingByCode = new Map(existingRows.map((m) => [m.code!, m]));
+
+  type CreateData = {
+    code: string;
+    name: string;
+    unit: string;
+    unitPriceEur: string | null;
+  };
+  const createByCode = new Map<string, CreateData>();
+  const updates: Array<{
+    id: string;
+    data: { name: string; unit: string; unitPriceEur: string | null };
+  }> = [];
+  const importedCodes: string[] = [];
+
+  for (const row of parsedRows) {
+    const existing = existingByCode.get(row.code);
+    const pendingCreate = createByCode.get(row.code);
+
+    if (existing) {
+      const next = {
+        name: row.name ?? existing.name,
+        unit: row.unit ?? existing.unit,
+        unitPriceEur: row.hasPrice
+          ? row.unitPriceEur
+          : (existing.unitPriceEur?.toString() ?? null),
+      };
+      const changed =
+        next.name !== existing.name ||
+        next.unit !== existing.unit ||
+        next.unitPriceEur !== (existing.unitPriceEur?.toString() ?? null);
+      if (changed) {
+        updates.push({ id: existing.id, data: next });
+      }
+      result.updated++;
+    } else if (pendingCreate) {
+      // Duplicate code within the CSV — later row overrides provided fields.
+      pendingCreate.name = row.name ?? pendingCreate.name;
+      pendingCreate.unit = row.unit ?? pendingCreate.unit;
+      pendingCreate.unitPriceEur = row.hasPrice
+        ? row.unitPriceEur
+        : pendingCreate.unitPriceEur;
+      result.updated++;
+    } else {
+      createByCode.set(row.code, {
+        code: row.code,
+        name: row.name ?? row.code,
+        unit: row.unit ?? "бр",
+        unitPriceEur: row.unitPriceEur,
+      });
+      result.created++;
+    }
+    importedCodes.push(row.code);
+  }
+
+  try {
+    if (createByCode.size > 0) {
+      await prisma.mrpMaterial.createMany({
+        data: [...createByCode.values()],
+        skipDuplicates: true,
+      });
+    }
+    if (updates.length > 0) {
+      const now = new Date();
+      await prisma.$transaction(
+        updates.map((u) =>
+          prisma.mrpMaterial.update({
+            where: { id: u.id },
+            data: { ...u.data, updatedAt: now },
+          }),
+        ),
+      );
+    }
+  } catch (err) {
+    result.ok = false;
+    result.errors.push({
+      row: 0,
+      message: err instanceof Error ? err.message : String(err),
+    });
+    return result;
   }
 
   await clearBomMissingMaterialCodes(importedCodes);

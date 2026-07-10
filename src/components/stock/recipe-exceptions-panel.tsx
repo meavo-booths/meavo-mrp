@@ -14,15 +14,10 @@ async function RecipeExceptionsContent({
   const t = await getTranslations({ locale, namespace: "stock.recipes" });
   const te = await getTranslations({ locale, namespace: "stock.recipes.exceptions" });
 
-  const [boothModels, materials, batches, activeExceptions] = await Promise.all([
+  const [boothModels, batches, activeExceptions] = await Promise.all([
     prisma.mrpBoothModel.findMany({
       where: { isActive: true },
       select: { id: true, name: true },
-      orderBy: { name: "asc" },
-    }),
-    prisma.mrpMaterial.findMany({
-      where: { isActive: true },
-      select: { id: true, code: true, name: true },
       orderBy: { name: "asc" },
     }),
     listManufacturingBatchOptions(),
@@ -33,7 +28,6 @@ async function RecipeExceptionsContent({
     <RecipeExceptionsSection
       models={boothModels}
       batches={batches}
-      materials={materials}
       activeExceptions={activeExceptions}
       labels={{
         title: te("title"),

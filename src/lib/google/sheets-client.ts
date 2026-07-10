@@ -7,28 +7,45 @@ export type SheetsGridCell = {
   hyperlink?: string;
 };
 
-async function getAccessToken(
-  readonly = true,
-  extraScopes: string[] = [],
-): Promise<string> {
+type AuthClient = Awaited<ReturnType<GoogleAuth["getClient"]>>;
+
+// Auth clients cached per scope set for the process lifetime; the underlying
+// google-auth-library client refreshes its token automatically before expiry.
+const authClientCache = new Map<string, Promise<AuthClient>>();
+
+function getAuthClient(scopes: string[]): Promise<AuthClient> {
+  const key = scopes.join(" ");
+  const cached = authClientCache.get(key);
+  if (cached) return cached;
+
   const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
   if (!raw) {
     throw new Error("GOOGLE_SERVICE_ACCOUNT_JSON is not set");
   }
-
-  const scopes = new Set([
-    readonly
-      ? "https://www.googleapis.com/auth/spreadsheets.readonly"
-      : "https://www.googleapis.com/auth/spreadsheets",
-    ...extraScopes,
-  ]);
-
   const credentials = JSON.parse(raw) as Record<string, unknown>;
-  const auth = new GoogleAuth({
-    credentials,
-    scopes: [...scopes],
+  const auth = new GoogleAuth({ credentials, scopes });
+  const promise = auth.getClient().catch((err) => {
+    authClientCache.delete(key);
+    throw err;
   });
-  const client = await auth.getClient();
+  authClientCache.set(key, promise);
+  return promise;
+}
+
+async function getAccessToken(
+  readonly = true,
+  extraScopes: string[] = [],
+): Promise<string> {
+  const scopes = [
+    ...new Set([
+      readonly
+        ? "https://www.googleapis.com/auth/spreadsheets.readonly"
+        : "https://www.googleapis.com/auth/spreadsheets",
+      ...extraScopes,
+    ]),
+  ].sort();
+
+  const client = await getAuthClient(scopes);
   const token = await client.getAccessToken();
   if (!token.token) {
     throw new Error("Failed to obtain Google Sheets access token");

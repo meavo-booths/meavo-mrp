@@ -1,8 +1,16 @@
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
-import { computeElementBomCostForMarket } from "@/lib/stock/bom-cost";
-import { applyMovement } from "@/lib/stock/movements";
+import {
+  computeBomCostFromRows,
+  loadBomRowsForElements,
+  type BomLineWithCost,
+} from "@/lib/stock/bom-cost";
+import {
+  applyMovementsInTx,
+  resolveWarehouseCodesForMovements,
+  type ApplyMovementInput,
+} from "@/lib/stock/movements";
 
 export type DeductionResult = {
   posted: number;
@@ -37,6 +45,14 @@ export async function postElementDeductions(input: {
       },
     },
   });
+  if (rows.length === 0) return result;
+
+  // One query for all BOM lines; resolution memoized per (element, colour).
+  const bomRowsByElement = await loadBomRowsForElements(
+    rows.map((row) => row.boothElementId),
+  );
+  const resolvedBomCache = new Map<string, BomLineWithCost[]>();
+  const noBomElementIds: string[] = [];
 
   for (const row of rows) {
     const batch = row.batchUnit.manufacturingBatch;
@@ -50,27 +66,29 @@ export async function postElementDeductions(input: {
     }
 
     try {
-      const { lines } = await computeElementBomCostForMarket({
-        boothElementId: row.boothElementId,
-        boothColour: row.batchUnit.colour,
-        boothMarket: "default",
-      });
+      const cacheKey = `${row.boothElementId}\u0000${row.batchUnit.colour ?? ""}`;
+      let lines = resolvedBomCache.get(cacheKey);
+      if (!lines) {
+        lines = computeBomCostFromRows(
+          bomRowsByElement.get(row.boothElementId) ?? [],
+          row.batchUnit.colour,
+          "default",
+        ).lines;
+        resolvedBomCache.set(cacheKey, lines);
+      }
 
       if (lines.length === 0) {
-        await prisma.mrpBatchUnitElement.update({
-          where: { id: row.id },
-          data: { deductionPosted: true },
-        });
+        noBomElementIds.push(row.id);
         result.skipped++;
         continue;
       }
 
-      for (const line of lines) {
+      const movements: ApplyMovementInput[] = lines.map((line) => {
         const delta = -Math.abs(Number(line.quantity));
-        await applyMovement({
+        return {
           warehouseId,
           materialId: line.materialId,
-          movementType: "element_consumption",
+          movementType: "element_consumption" as const,
           quantityDelta: delta.toFixed(4),
           effectiveAt: row.completedAt ?? new Date(),
           referenceId: row.id,
@@ -81,12 +99,19 @@ export async function postElementDeductions(input: {
             boothElementId: row.boothElementId,
             materialCode: line.materialCode,
           },
-        });
-      }
+        };
+      });
 
-      await prisma.mrpBatchUnitElement.update({
-        where: { id: row.id },
-        data: { deductionPosted: true },
+      // Movements + the deductionPosted flag commit atomically per element,
+      // so a deduction can never be posted twice or lost half-way.
+      const warehouseCodes =
+        await resolveWarehouseCodesForMovements(movements);
+      await prisma.$transaction(async (tx) => {
+        await applyMovementsInTx(tx, movements, warehouseCodes);
+        await tx.mrpBatchUnitElement.update({
+          where: { id: row.id },
+          data: { deductionPosted: true },
+        });
       });
       result.posted++;
     } catch (err) {
@@ -96,6 +121,13 @@ export async function postElementDeductions(input: {
         }`,
       );
     }
+  }
+
+  if (noBomElementIds.length > 0) {
+    await prisma.mrpBatchUnitElement.updateMany({
+      where: { id: { in: noBomElementIds } },
+      data: { deductionPosted: true },
+    });
   }
 
   return result;

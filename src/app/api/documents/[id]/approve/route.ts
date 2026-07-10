@@ -44,8 +44,9 @@ export async function POST(
     finalize: true,
   });
 
-  // Fire-and-forget the sync — failures end up in sync_attempts.
-  void enqueueZeronSync({ documentId: id, requestedBy: user.id });
+  // Queues the attempt (committed before the response); the adapter push
+  // runs after the response is sent — failures end up in sync_attempts.
+  await enqueueZeronSync({ documentId: id, requestedBy: user.id });
 
   return NextResponse.json({ ok: true });
 }

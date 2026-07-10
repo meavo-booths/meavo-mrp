@@ -13,7 +13,6 @@ import { cn } from "@/lib/utils/cn";
 
 type ModelOption = { id: string; name: string };
 type BatchOption = { id: string; name: string };
-type MaterialOption = { id: string; code: string | null; name: string };
 
 export type ExceptionListItem = {
   id: string;
@@ -27,7 +26,6 @@ export type ExceptionListItem = {
 type Props = {
   models: ModelOption[];
   batches: BatchOption[];
-  materials: MaterialOption[];
   activeExceptions: ExceptionListItem[];
   labels: RecipeExceptionLabels & {
     activeTitle: string;
@@ -40,7 +38,6 @@ type Props = {
 export function RecipeExceptionsSection({
   models,
   batches,
-  materials,
   activeExceptions,
   labels,
 }: Props) {
@@ -98,7 +95,6 @@ export function RecipeExceptionsSection({
             <RecipeExceptionForm
               models={models}
               batches={batches}
-              materials={materials}
               labels={labels}
               onCancel={() => setShowForm(false)}
             />

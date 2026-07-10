@@ -11,6 +11,7 @@ import {
   computeCompleteness,
   sortBatches,
 } from "@/lib/stock/manufacturing-batch-types";
+import { Prisma } from "@prisma/client";
 
 export type {
   BatchPanelColumn,
@@ -24,38 +25,64 @@ export function batchSpreadsheetUrl(spreadsheetId: string | null): string | null
   return `https://docs.google.com/spreadsheets/d/${spreadsheetId.trim()}`;
 }
 
-export async function listManufacturingBatches(): Promise<ManufacturingBatchRow[]> {
-  const rows = await prisma.mrpManufacturingBatch.findMany({
-    select: {
-      id: true,
-      name: true,
-      status: true,
-      qty: true,
-      batchSpreadsheetId: true,
-      lastSyncedAt: true,
-      boothModel: { select: { name: true } },
-      warehouse: { select: { name: true, code: true } },
-      units: {
-        select: {
-          elements: { select: { isComplete: true } },
-        },
-      },
-    },
-  });
+type BatchAggregateRow = {
+  batchId: string;
+  unitCount: bigint;
+  elementCount: bigint;
+  completeCount: bigint;
+};
 
-  const mapped = rows.map((row) => ({
-    id: row.id,
-    name: row.name,
-    status: row.status,
-    qty: row.qty,
-    modelName: row.boothModel?.name ?? null,
-    warehouseName: row.warehouse?.name ?? null,
-    warehouseCode: row.warehouse?.code ?? null,
-    unitCount: row.units.length,
-    completenessPct: computeCompleteness(row.units),
-    batchSpreadsheetId: row.batchSpreadsheetId,
-    lastSyncedAt: row.lastSyncedAt,
-  }));
+export async function listManufacturingBatches(): Promise<ManufacturingBatchRow[]> {
+  // Aggregate unit/element counts in SQL instead of loading every element row
+  // (a batch can have hundreds of units × dozens of elements).
+  const [rows, aggregates] = await Promise.all([
+    prisma.mrpManufacturingBatch.findMany({
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        qty: true,
+        batchSpreadsheetId: true,
+        lastSyncedAt: true,
+        boothModel: { select: { name: true } },
+        warehouse: { select: { name: true, code: true } },
+      },
+    }),
+    prisma.$queryRaw<BatchAggregateRow[]>(Prisma.sql`
+      SELECT
+        u."manufacturingBatchId" AS "batchId",
+        COUNT(DISTINCT u.id) AS "unitCount",
+        COUNT(e.id) AS "elementCount",
+        COUNT(e.id) FILTER (WHERE e."isComplete") AS "completeCount"
+      FROM "MrpBatchUnit" u
+      LEFT JOIN "MrpBatchUnitElement" e ON e."batchUnitId" = u.id
+      GROUP BY u."manufacturingBatchId"
+    `),
+  ]);
+
+  const aggregateByBatch = new Map(aggregates.map((a) => [a.batchId, a]));
+
+  const mapped = rows.map((row) => {
+    const agg = aggregateByBatch.get(row.id);
+    const elementCount = Number(agg?.elementCount ?? 0);
+    const completeCount = Number(agg?.completeCount ?? 0);
+    return {
+      id: row.id,
+      name: row.name,
+      status: row.status,
+      qty: row.qty,
+      modelName: row.boothModel?.name ?? null,
+      warehouseName: row.warehouse?.name ?? null,
+      warehouseCode: row.warehouse?.code ?? null,
+      unitCount: Number(agg?.unitCount ?? 0),
+      completenessPct:
+        elementCount === 0
+          ? null
+          : Math.round((completeCount / elementCount) * 1000) / 10,
+      batchSpreadsheetId: row.batchSpreadsheetId,
+      lastSyncedAt: row.lastSyncedAt,
+    };
+  });
 
   return sortBatches(mapped);
 }

@@ -11,10 +11,16 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { requireSessionUser } from "@/lib/auth/session";
-import { ensureStockReferenceData, listBalances } from "@/lib/stock";
+import {
+  ensureStockReferenceData,
+  getBalanceStats,
+  listBalances,
+} from "@/lib/stock";
 import { formatQuantity } from "@/lib/utils/format";
 
 export const dynamic = "force-dynamic";
+
+const HOME_BALANCES_LIMIT = 50;
 
 export default async function HomePage({
   params,
@@ -27,9 +33,10 @@ export default async function HomePage({
   await ensureStockReferenceData();
 
   const t = await getTranslations("home");
-  const balances = await listBalances();
-
-  const lowStock = balances.filter((b) => Number(b.quantity) <= 0);
+  const [stats, balances] = await Promise.all([
+    getBalanceStats(),
+    listBalances({ take: HOME_BALANCES_LIMIT, orderBy: "quantity" }),
+  ]);
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:py-12">
@@ -64,22 +71,20 @@ export default async function HomePage({
         <Card className="surface-accent-blue border-0">
           <CardHeader className="pb-2">
             <CardDescription>{t("stats.materials")}</CardDescription>
-            <CardTitle className="text-2xl">{balances.length}</CardTitle>
+            <CardTitle className="text-2xl">{stats.total}</CardTitle>
           </CardHeader>
         </Card>
         <Card className="surface-accent-yellow border-0">
           <CardHeader className="pb-2">
             <CardDescription>{t("stats.tracked")}</CardDescription>
-            <CardTitle className="text-2xl">
-              {balances.filter((b) => Number(b.quantity) > 0).length}
-            </CardTitle>
+            <CardTitle className="text-2xl">{stats.tracked}</CardTitle>
           </CardHeader>
         </Card>
         <Card className="surface-accent-pink col-span-2 border-0 sm:col-span-1">
           <CardHeader className="pb-2">
             <CardDescription>{t("stats.shortages")}</CardDescription>
             <CardTitle className="text-2xl text-destructive">
-              {lowStock.length}
+              {stats.shortages}
             </CardTitle>
           </CardHeader>
         </Card>
@@ -130,6 +135,14 @@ export default async function HomePage({
                   ))}
                 </tbody>
               </table>
+              {stats.total > balances.length ? (
+                <p className="mt-3 text-xs text-muted-foreground">
+                  {t("balancesShowingLowest", {
+                    shown: balances.length,
+                    total: stats.total,
+                  })}
+                </p>
+              ) : null}
             </div>
           )}
         </CardContent>

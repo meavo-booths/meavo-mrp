@@ -111,12 +111,3 @@ export async function clearBomMissingMaterialCodes(codes: string[]) {
     where: { code: { in: trimmed } },
   });
 }
-
-/** Materials page: refresh from sheet, fall back to stored table. */
-export async function refreshBomMissingMaterialsForUi(): Promise<BomMissingMaterial[]> {
-  try {
-    return await syncBomMissingFromMasterSheet();
-  } catch {
-    return listBomMissingMaterials();
-  }
-}

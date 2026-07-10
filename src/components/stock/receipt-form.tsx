@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,7 +19,6 @@ import {
 type WarehouseOption = { id: string; name: string; code: string };
 
 type Props = {
-  materials: MaterialCodeOption[];
   warehouses: WarehouseOption[];
   defaultWarehouseId: string;
   labels: {
@@ -33,17 +31,16 @@ type Props = {
     invoiceNumber: string;
     notes: string;
     submit: string;
+    success: string;
     error: string;
   };
 };
 
 export function ReceiptForm({
-  materials,
   warehouses,
   defaultWarehouseId,
   labels,
 }: Props) {
-  const router = useRouter();
   const [materialCode, setMaterialCode] = React.useState("");
   const [materialId, setMaterialId] = React.useState("");
   const handleMaterialResolved = React.useCallback(
@@ -60,6 +57,7 @@ export function ReceiptForm({
   const [invoiceNumber, setInvoiceNumber] = React.useState("");
   const [notes, setNotes] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
+  const [success, setSuccess] = React.useState(false);
   const [pending, setPending] = React.useState(false);
 
   async function onSubmit(e: React.FormEvent) {
@@ -70,6 +68,7 @@ export function ReceiptForm({
     }
     setPending(true);
     setError(null);
+    setSuccess(false);
     try {
       const res = await fetch("/api/stock/receipt", {
         method: "POST",
@@ -91,7 +90,7 @@ export function ReceiptForm({
       setInvoiceNumber("");
       setNotes("");
       setMaterialCode("");
-      router.refresh();
+      setSuccess(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : labels.error);
     } finally {
@@ -99,18 +98,9 @@ export function ReceiptForm({
     }
   }
 
-  if (materials.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        Add materials first before recording receipts.
-      </p>
-    );
-  }
-
   return (
     <form onSubmit={onSubmit} className="grid max-w-xl gap-4">
       <MaterialCodeField
-        materials={materials}
         value={materialCode}
         onChange={setMaterialCode}
         onResolved={handleMaterialResolved}
@@ -178,6 +168,7 @@ export function ReceiptForm({
         />
       </div>
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      {success ? <p className="text-sm text-primary">{labels.success}</p> : null}
       <Button type="submit" disabled={pending || !materialId}>
         {labels.submit}
       </Button>
