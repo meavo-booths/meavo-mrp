@@ -16,7 +16,7 @@ importers:
         version: 3.9.1(react-hook-form@7.75.0(react@19.2.4))
       '@meavo/db':
         specifier: github:meavo-booths/meavo-db#v0.3.1
-        version: https://codeload.github.com/meavo-booths/meavo-db/tar.gz/3da2d7a28e169b1aa1d6dbe5feb56ee94b56f4a3
+        version: https://codeload.github.com/meavo-booths/meavo-db/tar.gz/3115c0e03449efeed86a8712de16a3d4026acec0
       '@prisma/client':
         specifier: ^6.1.0
         version: 6.19.3(prisma@6.19.3(typescript@5.9.3))(typescript@5.9.3)
@@ -512,8 +512,8 @@ packages:
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
 
-  '@meavo/db@https://codeload.github.com/meavo-booths/meavo-db/tar.gz/3da2d7a28e169b1aa1d6dbe5feb56ee94b56f4a3':
-    resolution: {gitHosted: true, integrity: sha512-nKQS2baexywlpIENJLVSGi/iYjubqDlc0dLgZcXIMvBsGq8pb/X7iS3NdbS3pT7q/omZv2iv45eI9T2qIzB+QA==, tarball: https://codeload.github.com/meavo-booths/meavo-db/tar.gz/3da2d7a28e169b1aa1d6dbe5feb56ee94b56f4a3}
+  '@meavo/db@https://codeload.github.com/meavo-booths/meavo-db/tar.gz/3115c0e03449efeed86a8712de16a3d4026acec0':
+    resolution: {gitHosted: true, integrity: sha512-p/AAD1QxEKraQnlzc/DI5apHjWHMhXkv9Xhp9EQVuc79e7T6n7wwUNIYL1MVgMKrdTC8tQFyJpvg02RefQeTfw==, tarball: https://codeload.github.com/meavo-booths/meavo-db/tar.gz/3115c0e03449efeed86a8712de16a3d4026acec0}
     version: 0.3.1
 
   '@napi-rs/canvas-android-arm64@0.1.100':
@@ -3654,7 +3654,7 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  '@meavo/db@https://codeload.github.com/meavo-booths/meavo-db/tar.gz/3da2d7a28e169b1aa1d6dbe5feb56ee94b56f4a3': {}
+  '@meavo/db@https://codeload.github.com/meavo-booths/meavo-db/tar.gz/3115c0e03449efeed86a8712de16a3d4026acec0': {}
 
   '@napi-rs/canvas-android-arm64@0.1.100':
     optional: true
