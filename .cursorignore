@@ -1,0 +1,11 @@
+# Build artifacts — slow down search/indexing
+.next/
+out/
+dist/
+build/
+.vercel/
+node_modules/
+.turbo/
+coverage/
+public/sw.js
+tsconfig.tsbuildinfo

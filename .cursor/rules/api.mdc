@@ -1,0 +1,33 @@
+---
+description: API route handler rules for meavo-mrp
+globs:
+  - src/app/api/**
+---
+
+# API route rules
+
+This repo has **no Server Actions** — all mutations are route handlers under `src/app/api/`, called with client `fetch()`. Keep handlers thin: auth guard, Zod-validate, call `src/lib/<area>/`, map errors to JSON.
+
+## Auth
+
+- Every route starts with `const { user, error } = await requireApiUser(); if (error) return error;` (`src/lib/api/guard.ts`).
+- Cron/manual sync route `/api/sheets/sync`: accept `isAuthorizedCronRequest()` (Bearer `CRON_SECRET`) OR a session with `role === "admin"`.
+- Legacy invoice-scanner routes call `invoiceScannerDisabledResponse()` first (404 when the feature flag is off).
+- Never import `src/lib/auth.ts` (Prisma-backed) in `src/middleware.ts` — middleware uses the edge-safe `authConfig` from `src/lib/auth.config.ts`.
+
+## Validation & responses
+
+- Zod-parse request bodies at the boundary (schemas usually live next to the domain module, e.g. `src/lib/import/schemas.ts`, `src/lib/extractor/schema.ts`).
+- Errors: `NextResponse.json({ error: "message" }, { status: 4xx })` — never stack traces in production.
+- Long-running routes declare `maxDuration` in `vercel.json` (extract 60s, zeron 30s, sheets 300s).
+
+## Cron routes
+
+- `/api/sheets/sync` — every 2 hours (`0 */2 * * *` in `vercel.json`); the collector logic lives in `src/lib/sheets/sync.ts`, not in the route.
+- New cron routes: register in `vercel.json`, guard with `isAuthorizedCronRequest()`, keep the handler a thin wrapper over a `src/lib/` function.
+
+## Do NOT
+
+- Put business rules inline in route handlers
+- Skip auth on routes exposed to the internet
+- Mutate stock outside `applyMovement()` or call Zeron adapters outside `enqueueZeronSync()`

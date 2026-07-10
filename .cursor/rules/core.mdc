@@ -1,0 +1,60 @@
+---
+description: Core stack, layout, and guardrails for meavo-mrp
+alwaysApply: true
+---
+
+Environment: Next.js 16 App Router PWA at mrp.meavo.app. Satellite app of meavo-gateway on the shared Neon Postgres. NOT the legacy Supabase invoice scanner (see docs/archive-invoice-scanner.md).
+
+## Stack
+
+- Next.js 16 App Router, TypeScript strict, React 19 — **webpack forced** (`--webpack`; Serwist PWA is incompatible with Turbopack)
+- Tailwind CSS 4 + shadcn/ui (Radix primitives) in `src/components/ui/` — approved org deviation
+- Prisma 6 via `@meavo/db` (github tag) → shared Neon Postgres; schema at `node_modules/@meavo/db/prisma/schema.prisma`
+- NextAuth v5 JWT, Google SSO only, invite-only via gateway `ToolCardAccess` (`MRP_TOOL_CARD_ID`)
+- `next-intl` — locales `bg` (default) + `en`, all routes under `src/app/[locale]/`
+- `@google/genai` (Gemini) extraction, Vercel Blob storage, Serwist service worker (`src/sw.ts`)
+- pnpm 9+, Node 22+, Vercel `fra1`
+
+## Do NOT
+
+- Edit the Prisma schema here — it lives in meavo-db; bump the `@meavo/db` git tag instead
+- Run `prisma db push` — shared DB; script intentionally disabled
+- Write stock quantities directly — go through `applyMovement()` in `src/lib/stock/movements.ts`
+- Call Zeron adapters directly — use `enqueueZeronSync()` (`src/lib/zeron/queue.ts`)
+- Hardcode UI strings — use `next-intl` messages (`messages/bg.json` + `messages/en.json`)
+- Skip `requireApiUser()` in API routes — middleware excludes `/api/*`
+- Expose raw Vercel Blob URLs — stream originals via `/api/documents/[id]/file`
+- Switch dev/build to Turbopack
+- Commit secrets or `.env.local`
+
+## Code layout
+
+| Area | Path |
+|------|------|
+| Pages (locale-prefixed, auth via `(app)` group) | `src/app/[locale]/(app)/`, login at `src/app/[locale]/login/` |
+| API route handlers (primary mutation pattern — no Server Actions) | `src/app/api/` |
+| Domain logic | `src/lib/stock/`, `src/lib/documents/`, `src/lib/extractor/`, `src/lib/import/`, `src/lib/suppliers/`, `src/lib/learning/` |
+| Integrations | `src/lib/zeron/` (ERP), `src/lib/sheets/` + `src/lib/google/` (Sheets), `src/lib/storage/` (Blob) |
+| Auth | `src/lib/auth.ts`, `src/lib/auth/session.ts`, `src/lib/api/guard.ts`, `src/middleware.ts` |
+| i18n | `src/i18n/`, `messages/` |
+| Tests | N/A — `pnpm lint` + `pnpm typecheck` only |
+
+## Data flow
+
+```
+Browser (PWA) ──fetch──▶ /api/* route ──▶ src/lib/* ──▶ Prisma ──▶ shared Neon Postgres
+                                             │
+                                             ├─▶ enqueueZeronSync() ─▶ Zeron adapter (stub/export/api/agent) + MrpSyncAttempt audit
+                                             ├─▶ Gemini extraction (src/lib/extractor) ◀─ supplier hints (src/lib/learning)
+                                             └─▶ Vercel Blob (originals)
+Vercel cron (0 */2 * * *) ─▶ /api/sheets/sync ─▶ runSheetSync() ◀─ Google Sheets (batches) ─▶ stock deductions via applyMovement()
+```
+
+Every stock quantity change must be an `applyMovement()` call (writes `MrpStockMovement` ledger + updates `MrpStockBalance` cache). Every document approval that should reach Zeron must call `enqueueZeronSync()`.
+
+## Docs for agents
+
+- `AGENTS.md` — quick orientation
+- `docs/architecture.md` — stack, siblings, data flow
+- `docs/domain.md` — business rules, mutation map
+- `docs/data-model.md` — database tables

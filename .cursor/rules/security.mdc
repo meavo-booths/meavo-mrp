@@ -1,0 +1,44 @@
+---
+description: Meavo security standards for meavo-mrp
+alwaysApply: true
+---
+
+# Security rules — Meavo org standard
+
+Org standard (see STANDARDS.md §4 in meavo-agent-templates). Deviations for this repo are listed at the bottom.
+
+## Auth at every layer
+
+- Verify auth independently in: middleware (pages), the `(app)` layout, and API routes.
+- Middleware (`src/middleware.ts`) excludes `/api/*` from its matcher — never assume an API route is protected.
+- This repo's auth gates: `requireSessionUser()` (`src/lib/auth/session.ts`) in pages/layouts; `requireApiUser()` (`src/lib/api/guard.ts`) in API routes.
+- Tool card gating: Google sign-in checks `ToolCardAccess` for `MRP_TOOL_CARD_ID` (`seed-mrp-tool`) in the `signIn` callback (`src/lib/auth.ts`). Never look up the card by `linkedAppKey` at runtime.
+
+## Sessions & credentials
+
+- NextAuth v5 JWT sessions; token carries the gateway `User.id`; MRP role is loaded fresh from `MrpUserProfile` on every `getSessionUser()` call.
+- Google OAuth is invite-only — the gateway `User` must already exist AND hold `ToolCardAccess`; no self-registration, no Credentials provider.
+
+## Routes & rendering
+
+- Cron route `/api/sheets/sync`: `isAuthorizedCronRequest()` (`src/lib/cron-auth.ts`) — `Authorization: Bearer $CRON_SECRET`; admins may also trigger it via session.
+- `export const dynamic = "force-dynamic"` on authenticated, DB-touching pages.
+- Never return stack traces to clients in production.
+
+## Uploads & files
+
+- Vercel Blob, private; originals at `mrp/originals/{userId}/{documentId}/…` (`src/lib/storage/buckets.ts`).
+- Serve files ONLY through the authenticated `/api/documents/[id]/file` route — never expose Blob URLs.
+- Validate MIME + extension on upload; dedupe via `contentHash`.
+
+## Secrets
+
+- No secrets in client code, comments, or committed files.
+- Document env var names in `.env.example` only — never values.
+
+## Repo-specific deviations
+
+- No Credentials provider → no bcrypt / `LoginThrottle` usage (Google SSO only).
+- Session is not extended with `systemRole` / `hrAccess`; MRP uses its own `MrpUserProfile.role` (`scanner` / `reviewer` / `admin`) read from DB per request.
+- `next.config.ts` does not yet set the org security headers (`X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Strict-Transport-Security`) — add them there if touching that file, don't remove existing `sw.js` headers.
+- Role enforcement is thin today: only `/api/sheets/sync` requires `admin`. Tighten per-route when asked, don't invent new bypasses.

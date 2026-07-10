@@ -1,0 +1,27 @@
+---
+description: Domain layer patterns for meavo-mrp
+globs:
+  - src/lib/**
+---
+
+# Domain module rules
+
+Business logic lives in `src/lib/<area>/` — **not** in route handlers or React components.
+
+## Patterns
+
+1. Stock quantities change ONLY via `applyMovement()` (`src/lib/stock/movements.ts`): it appends to the `MrpStockMovement` ledger and updates the `MrpStockBalance` cache in one transaction. Never update balances or `MrpMaterial.currentQuantity` directly.
+2. Zeron sync goes through `enqueueZeronSync()` (`src/lib/zeron/queue.ts`) — creates an `MrpSyncAttempt` audit row and dispatches to the adapter chosen by `ZERON_ADAPTER` (`stub`/`export`/`api`/`agent`). New adapters implement `ZeronAdapter` in `src/lib/zeron/adapter.ts`.
+3. Document approval flow: `saveExtraction()` (`src/lib/documents/save.ts`) persists edits + `MrpCorrectionLog` rows; on approve also call `recordApprovedExtraction()` (`src/lib/learning/profile.ts`) so the supplier's few-shot profile learns.
+4. Supplier resolution via `findOrCreateSupplier()` (`src/lib/suppliers/match.ts`) — matches by VAT → EIK → normalized name; don't create `MrpSupplier` rows ad hoc.
+5. Server-only modules start with `import "server-only"`. Env access via the Zod-validated `env` from `src/lib/env.ts`, not raw `process.env` (except simple feature flags).
+6. Money/quantity math uses the decimal helpers in `src/lib/stock/decimal.ts` — Prisma `Decimal` fields, no float arithmetic.
+7. Reuse existing modules — search `src/lib/` before adding new files.
+
+## Sheets sync
+
+`runSheetSync()` (`src/lib/sheets/sync.ts`) is idempotent and audited in `MrpSheetSyncLog`. It upserts batches/units/element checkboxes keyed by sheet row, and posts stock deductions exactly once per completed element (`deductionPosted` flag). Preserve idempotency when changing it.
+
+## Mutation map
+
+See `docs/domain.md` for the full mutation map and role permissions.
