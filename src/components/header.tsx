@@ -66,11 +66,11 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/90">
-      <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4">
+      <div className="mx-auto flex h-16 w-full max-w-screen-2xl items-center gap-2 px-4 sm:px-6 lg:gap-3 lg:px-8">
         <Link href="/" className="flex shrink-0 items-center">
           <MeavoLogo />
         </Link>
-        <nav className="ml-1 flex flex-1 items-center gap-1 overflow-x-auto sm:ml-3">
+        <nav className="ml-1 flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto sm:ml-2 sm:gap-1 lg:overflow-x-visible">
           {items.map((item) => {
             const Icon = item.icon;
             const active =
@@ -82,7 +82,7 @@ export function Header() {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "inline-flex shrink-0 items-center gap-2 rounded-full px-2.5 py-2 text-sm font-medium transition-colors hover:bg-secondary",
+                  "inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-2 text-sm font-medium transition-colors hover:bg-secondary sm:gap-2 sm:px-2.5",
                   active && "bg-secondary text-foreground",
                 )}
               >

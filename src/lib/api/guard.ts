@@ -11,6 +11,18 @@ export async function requireApiUser() {
   return { user, error: null };
 }
 
+export async function requireAppAdmin() {
+  const { user, error } = await requireApiUser();
+  if (error) return { user: null as never, error };
+  if (user.role !== "admin") {
+    return {
+      user: null as never,
+      error: NextResponse.json({ error: "Forbidden" }, { status: 403 }),
+    };
+  }
+  return { user, error: null };
+}
+
 export function invoiceScannerDisabledResponse() {
   if (!isInvoiceScannerEnabled()) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });

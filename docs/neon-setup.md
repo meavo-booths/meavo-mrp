@@ -31,6 +31,10 @@ this repo's `package.json`.
 - App roles (`scanner` / `reviewer` / `admin`) live in `MrpUserProfile`,
   auto-created with `scanner` on first login. Promote users by updating that
   row (e.g. via Prisma Studio in meavo-db or the gateway DB console).
+- **MRP admin access** is also granted by email: built-in admins
+  (`todor@meavo.com`, `boyan@meavo.com`) plus any addresses added under
+  **Settings → Admin access** in the app (stored in Vercel Blob). Effective
+  role is resolved on every request in `getSessionUser()`.
 
 ## Files
 

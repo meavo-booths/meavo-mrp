@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { requireApiUser } from "@/lib/api/guard";
+import { requireAppAdmin, requireApiUser } from "@/lib/api/guard";
 import {
   normalizeMaterialCodeList,
   parseMaterialCodeList,
@@ -32,12 +32,8 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
-  const { user, error } = await requireApiUser();
+  const { user, error } = await requireAppAdmin();
   if (error) return error;
-
-  if (user.role !== "admin") {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
 
   const body = PutSchema.parse(await request.json());
   const codes =

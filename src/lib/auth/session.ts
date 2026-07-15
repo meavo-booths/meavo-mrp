@@ -6,8 +6,11 @@ import { redirect } from "next/navigation";
 
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { resolveEffectiveRole } from "@/lib/settings/admin-access";
 
-export type MrpRole = "scanner" | "reviewer" | "admin";
+import type { MrpRole } from "@/lib/auth/roles";
+
+export type { MrpRole };
 
 export type SessionUser = {
   id: string;
@@ -39,12 +42,15 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
   });
   if (!user) return null;
 
+  const dbRole = user.mrpProfile?.role ?? "scanner";
+  const role = await resolveEffectiveRole(user.email, dbRole);
+
   return {
     id,
     email: user.email,
     fullName: user.name,
     avatarUrl: user.image,
-    role: user.mrpProfile?.role ?? "scanner",
+    role,
   };
 });
 

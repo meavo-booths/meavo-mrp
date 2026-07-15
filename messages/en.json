@@ -387,6 +387,37 @@
   "settings": {
     "title": "Settings",
     "subtitle": "Configure shortcuts and preferences for the stock team.",
+    "access": {
+      "currentTitle": "Your access",
+      "roles": {
+        "admin": "Admin",
+        "reviewer": "Reviewer",
+        "scanner": "Scanner"
+      }
+    },
+    "adminAccess": {
+      "title": "Admin access",
+      "description": "These accounts can edit settings, top materials, and trigger manual sheet sync. Built-in admins always keep access.",
+      "bootstrapLabel": "Built-in admins",
+      "bootstrapHelp": "Always active — change only in code deploy.",
+      "pasteLabel": "Paste admin emails",
+      "pastePlaceholder": "ops@meavo.com\nwarehouse@meavo.com",
+      "pasteHelp": "One email per line or separated by commas. Added to the built-in list.",
+      "applyPaste": "Apply pasted list",
+      "addLabel": "Add email",
+      "addPlaceholder": "name@meavo.com",
+      "addButton": "Add",
+      "configuredLabel": "Additional admins",
+      "configuredEmpty": "No extra admins beyond the built-in list.",
+      "configuredCount": "{count} added",
+      "remove": "Remove",
+      "save": "Save admin list",
+      "saving": "Saving…",
+      "saved": "Saved",
+      "error": "Could not save",
+      "invalidEmail": "Enter a valid email address",
+      "storageUnavailable": "Storage is not configured on this environment — contact an admin."
+    },
     "topMaterials": {
       "title": "Top 20 materials",
       "description": "Priority material codes shown on the home page. Paste a list or add codes one by one.",
