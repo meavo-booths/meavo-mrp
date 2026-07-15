@@ -6,6 +6,12 @@ import { Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { MaterialUnitSelect } from "@/components/stock/material-unit-select";
+import {
+  isCanonicalMaterialUnit,
+  MRP_MATERIAL_UNITS,
+  normalizeMaterialUnit,
+} from "@/lib/stock/material-units";
 
 type Material = {
   id: string;
@@ -30,8 +36,14 @@ type Labels = {
 type Props = {
   materials: Material[];
   locale: string;
+  invalidUnitIds: Set<string>;
   labels: Labels;
 };
+
+function initialEditUnit(material: Material): string {
+  if (isCanonicalMaterialUnit(material.unit.trim())) return material.unit;
+  return normalizeMaterialUnit(material.unit) ?? MRP_MATERIAL_UNITS[0];
+}
 
 type EditState = {
   id: string;
@@ -45,7 +57,12 @@ type EditState = {
  * One client island for the whole list (instead of one per row) with
  * optimistic updates on save — no full route refresh needed.
  */
-export function MaterialsList({ materials, locale, labels }: Props) {
+export function MaterialsList({
+  materials,
+  locale,
+  invalidUnitIds,
+  labels,
+}: Props) {
   // Locally saved edits layered over the server-rendered rows.
   const [overrides, setOverrides] = React.useState<Map<string, Material>>(
     () => new Map(),
@@ -60,7 +77,7 @@ export function MaterialsList({ materials, locale, labels }: Props) {
       id: material.id,
       code: material.code ?? "",
       name: material.name,
-      unit: material.unit,
+      unit: initialEditUnit(material),
       unitPriceEur: material.unitPriceEur ?? "",
     });
   }
@@ -135,9 +152,9 @@ export function MaterialsList({ materials, locale, labels }: Props) {
                 </div>
                 <div className="space-y-1">
                   <Label>{labels.unit}</Label>
-                  <Input
+                  <MaterialUnitSelect
                     value={edit.unit}
-                    onChange={(e) => setEdit({ ...edit, unit: e.target.value })}
+                    onChange={(value) => setEdit({ ...edit, unit: value })}
                   />
                 </div>
                 <div className="space-y-1 sm:col-span-2">
@@ -192,7 +209,13 @@ export function MaterialsList({ materials, locale, labels }: Props) {
                   .join(" · ")}
               </p>
             </div>
-            <span className="shrink-0 tabular-nums text-muted-foreground">
+            <span
+              className={
+                invalidUnitIds.has(material.id)
+                  ? "shrink-0 tabular-nums font-medium text-amber-800"
+                  : "shrink-0 tabular-nums text-muted-foreground"
+              }
+            >
               {Number(material.currentQuantity).toLocaleString(locale)}{" "}
               {material.unit}
             </span>

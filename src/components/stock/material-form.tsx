@@ -5,6 +5,7 @@ import { useRouter } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { MaterialUnitSelect } from "@/components/stock/material-unit-select";
 
 type Props = {
   labels: {
@@ -22,7 +23,7 @@ export function MaterialForm({ labels }: Props) {
   const router = useRouter();
   const [code, setCode] = React.useState("");
   const [name, setName] = React.useState("");
-  const [unit, setUnit] = React.useState("kg");
+  const [unit, setUnit] = React.useState("бр");
   const [unitPriceEur, setUnitPriceEur] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
   const [pending, setPending] = React.useState(false);
@@ -48,7 +49,7 @@ export function MaterialForm({ labels }: Props) {
       }
       setCode("");
       setName("");
-      setUnit("kg");
+      setUnit("бр");
       setUnitPriceEur("");
       router.refresh();
     } catch (err) {
@@ -71,11 +72,10 @@ export function MaterialForm({ labels }: Props) {
       </div>
       <div className="space-y-2">
         <Label htmlFor="material-unit">{labels.unit}</Label>
-        <Input
+        <MaterialUnitSelect
           id="material-unit"
           value={unit}
-          onChange={(e) => setUnit(e.target.value)}
-          required
+          onChange={setUnit}
         />
       </div>
       <div className="space-y-2">

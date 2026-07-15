@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 
 import { Link } from "@/i18n/navigation";
 import { BomMissingMaterialsBanner } from "@/components/stock/bom-missing-banner";
+import { InvalidMaterialUnitsBanner } from "@/components/stock/invalid-material-units-banner";
 import { CsvDataPanel } from "@/components/stock/csv-data-panel";
 import { MaterialForm } from "@/components/stock/material-form";
 import { MaterialsList } from "@/components/stock/materials-list";
@@ -18,6 +19,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { requireSessionUser } from "@/lib/auth/session";
 import { listBomMissingMaterials } from "@/lib/stock/bom-missing";
+import { listMaterialsWithInvalidUnits } from "@/lib/stock/material-unit-issues";
 import { ensureStockReferenceData } from "@/lib/stock";
 
 export const dynamic = "force-dynamic";
@@ -55,9 +57,10 @@ export default async function MaterialsPage({
       : {}),
   };
 
-  const [total, bomMissing] = await Promise.all([
+  const [total, bomMissing, invalidUnits] = await Promise.all([
     prisma.mrpMaterial.count({ where }),
     listBomMissingMaterials(),
+    listMaterialsWithInvalidUnits(),
   ]);
 
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -115,6 +118,15 @@ export default async function MaterialsPage({
         lineLabel={t("bomMissingLines")}
       />
 
+      <InvalidMaterialUnitsBanner
+        items={invalidUnits}
+        title={t("invalidUnitsTitle")}
+        description={t("invalidUnitsDescription", {
+          count: invalidUnits.length,
+        })}
+        suggestedLabel={t("invalidUnitsSuggested")}
+      />
+
       <div className="mb-6">
         <CsvDataPanel kind="materials" labels={csvLabels} />
       </div>
@@ -165,6 +177,7 @@ export default async function MaterialsPage({
               <MaterialsList
                 materials={materials}
                 locale={locale}
+                invalidUnitIds={new Set(invalidUnits.map((item) => item.id))}
                 labels={{
                   edit: t("edit"),
                   save: t("save"),

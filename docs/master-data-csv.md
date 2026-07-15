@@ -17,7 +17,7 @@ Meavo MRP accepts the same column layout as the [master Google Sheet](https://do
 |--------|----------|-------|
 | `code` | Yes | Unique |
 | `name` | No | Defaults to `code` if empty |
-| `unit` | No | Defaults to `бр` on insert |
+| `unit` | No | One of `бр`, `квм`, `м`, `л`, `кг` (aliases like `kg`, `m2` are normalized on import). Defaults to `бр` on insert |
 | `unit_price_eur` | No | EUR per unit for BOM cost |
 
 ### Elements

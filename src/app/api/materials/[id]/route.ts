@@ -6,6 +6,10 @@ import { requireApiUser } from "@/lib/api/guard";
 import { prisma } from "@/lib/prisma";
 import { parseOptionalPrice } from "@/lib/import/schemas";
 import { clearBomMissingMaterialCodes } from "@/lib/stock/bom-missing";
+import {
+  INVALID_MATERIAL_UNIT_ERROR,
+  resolveMaterialUnit,
+} from "@/lib/stock/material-units";
 
 export const runtime = "nodejs";
 
@@ -33,6 +37,18 @@ export async function PATCH(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
+  let unit = existing.unit;
+  if (body.unit !== undefined) {
+    const resolved = resolveMaterialUnit(body.unit, "manual");
+    if (!resolved) {
+      return NextResponse.json(
+        { error: INVALID_MATERIAL_UNIT_ERROR },
+        { status: 400 },
+      );
+    }
+    unit = resolved.unit;
+  }
+
   let unitPriceEur: Prisma.Decimal | string | null = existing.unitPriceEur;
   if (body.unitPriceEur !== undefined) {
     unitPriceEur =
@@ -46,7 +62,7 @@ export async function PATCH(
     data: {
       code: body.code !== undefined ? body.code : existing.code,
       name: body.name ?? existing.name,
-      unit: body.unit ?? existing.unit,
+      unit,
       unitPriceEur,
       updatedAt: new Date(),
     },

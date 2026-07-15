@@ -98,7 +98,10 @@
       "showingRange": "Показани {from}–{to} от {total}",
       "pagePrev": "Назад",
       "pageNext": "Напред",
-      "bomMissingLines": "BOM редове"
+      "bomMissingLines": "BOM редове",
+      "invalidUnitsTitle": "Невалидни мерни единици",
+      "invalidUnitsDescription": "{count} материала имат мерна единица извън Zeron списъка (бр, квм, м, л, кг) — коригирайте ги.",
+      "invalidUnitsSuggested": "предложение"
     },
     "electrics": {
       "title": "Електрика",

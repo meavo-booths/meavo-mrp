@@ -5,6 +5,7 @@ import {
   isZeronWebhookAuthConfigured,
 } from "@/lib/zeron/webhook-auth";
 import { receiveZeronInbound } from "@/lib/zeron/inbound";
+import { processZeronInboundPayload } from "@/lib/zeron/inbound-process";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -38,11 +39,19 @@ export async function POST(request: Request) {
 
   try {
     const receipt = await receiveZeronInbound({ body: raw, contentType });
+    const processed = await processZeronInboundPayload({ body: raw, contentType });
     return NextResponse.json(
       {
         ok: true,
         id: receipt.id,
         receivedAt: receipt.receivedAt,
+        ...(processed ?
+          {
+            materialsUpserted: processed.materialsUpserted,
+            materialsCreated: processed.materialsCreated,
+            flaggedUnits: processed.flaggedUnits,
+          }
+        : {}),
       },
       { status: 200 },
     );

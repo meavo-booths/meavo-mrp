@@ -211,7 +211,10 @@ Set on Vercel → Environment Variables:
 - `ZERON_WEBHOOK_TOKEN` — long random hex string, **or**
 - `ZERON_WEBHOOK_USER` + `ZERON_WEBHOOK_PASSWORD`
 
-**Request body:** JSON or XML (stored as-is until schema is confirmed).
+**Request body:** JSON or XML (stored as-is until schema is confirmed). JSON payloads
+with a `materials` / `items` / `nomenclature` array are upserted into Materials;
+known unit aliases are normalized (`kg` → `кг`), unknown units are accepted and
+flagged on the Materials page for manual review.
 
 **Success response:** `200` with `{ "ok": true, "id": "<uuid>", "receivedAt": "<ISO8601>" }`.
 

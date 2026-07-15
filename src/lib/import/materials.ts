@@ -8,6 +8,10 @@ import {
 import { emptyImportResult, type ImportResult } from "@/lib/import/types";
 import { prisma } from "@/lib/prisma";
 import { clearBomMissingMaterialCodes } from "@/lib/stock/bom-missing";
+import {
+  INVALID_MATERIAL_UNIT_ERROR,
+  resolveMaterialUnit,
+} from "@/lib/stock/material-units";
 
 export function materialsTemplateCsv(): string {
   return serializeCsv([...MATERIALS_COLUMNS], [
@@ -57,11 +61,26 @@ export async function importMaterialsCsv(
     if (!code) continue;
 
     try {
+      const rawUnit = raw.unit?.trim() || null;
+      let unit: string | null = null;
+      if (rawUnit) {
+        const resolved = resolveMaterialUnit(rawUnit, "manual");
+        if (!resolved) {
+          result.ok = false;
+          result.errors.push({
+            row: rowNum,
+            message: `${INVALID_MATERIAL_UNIT_ERROR} (${rawUnit})`,
+          });
+          continue;
+        }
+        unit = resolved.unit;
+      }
+
       parsedRows.push({
         rowNum,
         code,
         name: raw.name?.trim() || null,
-        unit: raw.unit?.trim() || null,
+        unit,
         unitPriceEur: parseOptionalPrice(raw.unit_price_eur ?? ""),
         hasPrice: Boolean(raw.unit_price_eur?.trim()),
       });

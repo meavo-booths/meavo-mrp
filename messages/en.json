@@ -98,7 +98,10 @@
       "pageNext": "Next",
       "bomMissingTitle": "Materials missing from master list",
       "bomMissingDescription": "{count} code(s) appear in ElementBOM but are not in Materials — add them or re-import Materials.",
-      "bomMissingLines": "BOM lines"
+      "bomMissingLines": "BOM lines",
+      "invalidUnitsTitle": "Invalid units of measure",
+      "invalidUnitsDescription": "{count} material(s) use a unit outside the Zeron list (бр, квм, м, л, кг) — fix them.",
+      "invalidUnitsSuggested": "suggested"
     },
     "electrics": {
       "title": "Electrics",
