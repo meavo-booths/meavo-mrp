@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import {
   MaterialCodeField,
@@ -13,7 +14,6 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   normalizeMaterialCodeList,
   parseMaterialCodeList,
-  TOP_MATERIALS_MAX,
 } from "@/lib/settings/parse-code-list";
 
 export type TopMaterialEntry = {
@@ -35,7 +35,6 @@ type Labels = {
   addButton: string;
   listLabel: string;
   listEmpty: string;
-  listCount: string;
   unknownCode: string;
   moveUp: string;
   moveDown: string;
@@ -55,69 +54,122 @@ type Props = {
   labels: Labels;
 };
 
+function entriesToMap(entries: TopMaterialEntry[]): Map<string, TopMaterialEntry> {
+  return new Map(entries.map((entry) => [entry.code.toLowerCase(), entry]));
+}
+
 export function TopMaterialsSettings({
   initialEntries,
   canEdit,
   storageConfigured,
   labels,
 }: Props) {
+  const t = useTranslations("settings.topMaterials");
   const [codes, setCodes] = React.useState(
     () => initialEntries.map((entry) => entry.code),
   );
-  const [namesByCode, setNamesByCode] = React.useState(() => {
-    const map = new Map<string, string | null>();
-    for (const entry of initialEntries) {
-      map.set(entry.code.toLowerCase(), entry.name);
-    }
-    return map;
-  });
+  const [entriesByCode, setEntriesByCode] = React.useState(() =>
+    entriesToMap(initialEntries),
+  );
   const [paste, setPaste] = React.useState("");
   const [addQuery, setAddQuery] = React.useState("");
   const [pending, setPending] = React.useState(false);
+  const [resolving, setResolving] = React.useState(false);
   const [message, setMessage] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
 
+  const refreshEntries = React.useCallback(async (nextCodes: string[]) => {
+    if (nextCodes.length === 0) {
+      setEntriesByCode(new Map());
+      return;
+    }
+
+    setResolving(true);
+    try {
+      const res = await fetch("/api/settings/top-materials/lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ codes: nextCodes }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        entries?: TopMaterialEntry[];
+        error?: string;
+      };
+      if (!res.ok) {
+        throw new Error(data.error ?? labels.error);
+      }
+      if (data.entries) {
+        setEntriesByCode(entriesToMap(data.entries));
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : labels.error);
+    } finally {
+      setResolving(false);
+    }
+  }, [labels.error]);
+
   function rememberMaterial(material: MaterialCodeOption | null) {
     if (!material?.code) return;
-    setNamesByCode((prev) => {
+    setEntriesByCode((prev) => {
       const next = new Map(prev);
-      next.set(material.code!.toLowerCase(), material.name);
+      next.set(material.code!.toLowerCase(), {
+        code: material.code!,
+        name: material.name,
+        materialId: material.id,
+        found: true,
+      });
       return next;
     });
   }
 
-  function addCode(raw: string, material?: MaterialCodeOption | null) {
+  async function addCode(raw: string, material?: MaterialCodeOption | null) {
     const trimmed = raw.trim();
     if (!trimmed) return;
 
+    let nextCodes: string[] = [];
     setCodes((prev) => {
       const exists = prev.some(
         (code) => code.toLowerCase() === trimmed.toLowerCase(),
       );
       if (exists) return prev;
-      const next = normalizeMaterialCodeList([...prev, trimmed]);
-      return next;
+      nextCodes = normalizeMaterialCodeList([...prev, trimmed]);
+      return nextCodes;
     });
+
+    if (nextCodes.length === 0) return;
 
     if (material?.code) {
       rememberMaterial(material);
+    } else {
+      await refreshEntries(nextCodes);
     }
     setAddQuery("");
     setMessage(null);
     setError(null);
   }
 
-  function applyPaste() {
+  async function applyPaste() {
     const parsed = parseMaterialCodeList(paste);
     if (parsed.length === 0) return;
-    setCodes(normalizeMaterialCodeList(parsed));
+    const next = normalizeMaterialCodeList(parsed);
+    setCodes(next);
     setPaste("");
     setMessage(null);
     setError(null);
+    await refreshEntries(next);
   }
 
   function removeCode(index: number) {
-    setCodes((prev) => prev.filter((_, i) => i !== index));
+    setCodes((prev) => {
+      const next = prev.filter((_, i) => i !== index);
+      setEntriesByCode((entries) => {
+        const map = new Map(entries);
+        const removed = prev[index]?.toLowerCase();
+        if (removed) map.delete(removed);
+        return map;
+      });
+      return next;
+    });
     setMessage(null);
     setError(null);
   }
@@ -155,14 +207,7 @@ export function TopMaterialsSettings({
 
       if (data.codes) setCodes(data.codes);
       if (data.entries) {
-        setNamesByCode(
-          new Map(
-            data.entries.map((entry) => [
-              entry.code.toLowerCase(),
-              entry.name,
-            ]),
-          ),
-        );
+        setEntriesByCode(entriesToMap(data.entries));
       }
       setMessage(labels.saved);
     } catch (err) {
@@ -201,7 +246,7 @@ export function TopMaterialsSettings({
               type="button"
               variant="outline"
               onClick={applyPaste}
-              disabled={!storageConfigured || !paste.trim()}
+              disabled={!storageConfigured || !paste.trim() || resolving}
             >
               {labels.applyPaste}
             </Button>
@@ -209,30 +254,30 @@ export function TopMaterialsSettings({
 
           <div className="space-y-2">
             <Label htmlFor="top-materials-add">{labels.addLabel}</Label>
-            <div className="flex flex-col gap-2 sm:flex-row">
+            <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
               <MaterialCodeField
                 inputId="top-materials-add"
+                hideLabel
                 value={addQuery}
                 onChange={setAddQuery}
                 onResolved={(material) => {
-                  if (material?.code) addCode(material.code, material);
+                  if (material?.code) void addCode(material.code, material);
                 }}
                 labels={{
                   material: labels.addLabel,
                   materialSearchPlaceholder: labels.addPlaceholder,
                   materialUnknown: labels.unknownCode,
                 }}
-                className="flex-1"
               />
               <Button
                 type="button"
                 variant="outline"
-                className="shrink-0"
-                onClick={() => addCode(addQuery)}
+                className="h-10 shrink-0"
+                onClick={() => void addCode(addQuery)}
                 disabled={
                   !storageConfigured ||
                   !addQuery.trim() ||
-                  codes.length >= TOP_MATERIALS_MAX
+                  resolving
                 }
               >
                 <Plus className="h-4 w-4" />
@@ -247,7 +292,7 @@ export function TopMaterialsSettings({
         <div className="flex items-center justify-between gap-3">
           <Label>{labels.listLabel}</Label>
           <span className="text-sm text-muted-foreground">
-            {labels.listCount.replace("{count}", String(codes.length))}
+            {t("listCount", { count: codes.length })}
           </span>
         </div>
 
@@ -256,8 +301,9 @@ export function TopMaterialsSettings({
         ) : (
           <ul className="divide-y rounded-lg border">
             {codes.map((code, index) => {
-              const name = namesByCode.get(code.toLowerCase());
-              const known = name != null;
+              const entry = entriesByCode.get(code.toLowerCase());
+              const found = entry?.found ?? false;
+              const name = entry?.name ?? null;
               return (
                 <li
                   key={`${code}-${index}`}
@@ -270,12 +316,16 @@ export function TopMaterialsSettings({
                     <p className="font-medium tabular-nums">{code}</p>
                     <p
                       className={
-                        known ?
+                        found ?
                           "truncate text-muted-foreground"
                         : "truncate text-amber-800"
                       }
                     >
-                      {known ? name : labels.unknownCode}
+                      {resolving && !entry ?
+                        t("resolving")
+                      : found && name ?
+                        name
+                      : labels.unknownCode}
                     </p>
                   </div>
                   {canEdit ? (
@@ -323,7 +373,7 @@ export function TopMaterialsSettings({
           <Button
             type="button"
             onClick={onSave}
-            disabled={pending || !storageConfigured}
+            disabled={pending || resolving || !storageConfigured}
           >
             {pending ? labels.saving : labels.save}
           </Button>

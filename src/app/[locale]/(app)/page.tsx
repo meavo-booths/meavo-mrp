@@ -15,10 +15,12 @@ import {
   ensureStockReferenceData,
   getBalanceStats,
   getTopMaterialHomeStats,
+  listActiveWarehouses,
   listBalances,
   listTopMaterialHomeRows,
 } from "@/lib/stock";
 import { getTopMaterialCodes } from "@/lib/settings/top-materials";
+import { TopMaterialsTable } from "@/components/stock/top-materials-table";
 import { formatQuantity } from "@/lib/utils/format";
 
 export const dynamic = "force-dynamic";
@@ -39,9 +41,10 @@ export default async function HomePage({
   const topCodes = await getTopMaterialCodes();
   const usingTopMaterials = topCodes.length > 0;
 
-  const [stats, topRows, fallbackBalances] = await Promise.all([
+  const [stats, topRows, warehouses, fallbackBalances] = await Promise.all([
     usingTopMaterials ? getTopMaterialHomeStats() : getBalanceStats(),
     usingTopMaterials ? listTopMaterialHomeRows() : Promise.resolve([]),
+    usingTopMaterials ? listActiveWarehouses() : Promise.resolve([]),
     usingTopMaterials ?
       Promise.resolve([])
     : listBalances({
@@ -124,57 +127,20 @@ export default async function HomePage({
               <p className="text-sm text-muted-foreground">
                 {t("topMaterialsEmpty")}
               </p>
-            : <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b text-left text-muted-foreground">
-                      <th className="pb-2 pr-4 font-medium">
-                        {t("colMaterial")}
-                      </th>
-                      <th className="pb-2 pr-4 font-medium">
-                        {t("colWarehouse")}
-                      </th>
-                      <th className="pb-2 font-medium text-right">
-                        {t("colQuantity")}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {topRows.map((row) => (
-                      <tr
-                        key={row.code}
-                        className="border-b last:border-0"
-                      >
-                        <td className="py-2.5 pr-4">
-                          <span className="font-medium">
-                            {row.materialName ?? row.code}
-                          </span>
-                          {row.found && row.materialName ? (
-                            <span className="ml-2 text-muted-foreground">
-                              {row.code}
-                            </span>
-                          ) : null}
-                        </td>
-                        <td className="py-2.5 pr-4 text-muted-foreground">
-                          {row.warehouseName}
-                        </td>
-                        <td
-                          className={`py-2.5 text-right tabular-nums ${
-                            row.isShortage ? "text-destructive" : ""
-                          }`}
-                        >
-                          {!row.found ?
-                            t("topMaterialUnknown")
-                          : !row.hasBaseline ?
-                            t("topMaterialNotCounted")
-                          : row.quantity != null ?
-                            formatQuantity(row.quantity, locale, row.unit)
-                          : t("topMaterialNotCounted")}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            : <>
+                <TopMaterialsTable
+                  rows={topRows}
+                  warehouses={warehouses}
+                  locale={locale}
+                  labels={{
+                    colMaterial: t("colMaterial"),
+                    colQuantity: t("colQuantity"),
+                    warehouseAll: t("warehouseAll"),
+                    warehouseTotal: t("warehouseTotal"),
+                    notCounted: t("topMaterialNotCounted"),
+                    unknownCode: t("topMaterialUnknown"),
+                  }}
+                />
                 <p className="mt-3 text-xs text-muted-foreground">
                   {t("topMaterialsManageHint")}{" "}
                   <Link
@@ -184,7 +150,7 @@ export default async function HomePage({
                     {t("topMaterialsManageLink")}
                   </Link>
                 </p>
-              </div>
+              </>
 
           : fallbackBalances.length === 0 ?
             <p className="text-sm text-muted-foreground">{t("balancesEmpty")}</p>

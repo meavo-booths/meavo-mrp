@@ -27,6 +27,7 @@ type Props = {
   labels: Labels;
   inputId?: string;
   className?: string;
+  hideLabel?: boolean;
 };
 
 /** Match typed digits to stored code (exact, zero-padded, or numeric). */
@@ -104,6 +105,7 @@ export function MaterialCodeField({
   labels,
   inputId = "material-code",
   className,
+  hideLabel = false,
 }: Props) {
   const rootRef = React.useRef<HTMLDivElement>(null);
   const [open, setOpen] = React.useState(false);
@@ -227,7 +229,9 @@ export function MaterialCodeField({
 
   return (
     <div ref={rootRef} className={cn("relative space-y-2", className)}>
-      <Label htmlFor={inputId}>{labels.material}</Label>
+      {hideLabel ? null : (
+        <Label htmlFor={inputId}>{labels.material}</Label>
+      )}
       <Input
         id={inputId}
         autoComplete="off"
@@ -235,6 +239,7 @@ export function MaterialCodeField({
         aria-expanded={showSuggestions}
         aria-autocomplete="list"
         aria-controls={showSuggestions ? `${inputId}-listbox` : undefined}
+        aria-label={hideLabel ? labels.material : undefined}
         className="font-normal"
         placeholder={labels.materialSearchPlaceholder}
         value={value}

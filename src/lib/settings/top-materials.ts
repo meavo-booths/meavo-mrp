@@ -4,7 +4,6 @@ import { get, put } from "@vercel/blob";
 
 import {
   normalizeMaterialCodeList,
-  TOP_MATERIALS_MAX,
 } from "@/lib/settings/parse-code-list";
 import { prisma } from "@/lib/prisma";
 
@@ -103,12 +102,12 @@ function resolveMaterial(
   return null;
 }
 
-export async function getTopMaterialsDetail(): Promise<{
-  entries: TopMaterialEntry[];
-  max: number;
-  storageConfigured: boolean;
-}> {
-  const codes = await getTopMaterialCodes();
+export async function resolveTopMaterialEntries(
+  codes: string[],
+): Promise<TopMaterialEntry[]> {
+  const normalized = normalizeMaterialCodeList(codes);
+  if (normalized.length === 0) return [];
+
   const materials = await prisma.mrpMaterial.findMany({
     where: { isActive: true, code: { not: null } },
     select: { id: true, code: true, name: true },
@@ -118,7 +117,7 @@ export async function getTopMaterialsDetail(): Promise<{
     materials.filter((m): m is MaterialRow => Boolean(m.code)),
   );
 
-  const entries = codes.map((code) => {
+  return normalized.map((code) => {
     const material = resolveMaterial(code, lookup);
     return {
       code,
@@ -127,10 +126,17 @@ export async function getTopMaterialsDetail(): Promise<{
       found: Boolean(material),
     };
   });
+}
+
+export async function getTopMaterialsDetail(): Promise<{
+  entries: TopMaterialEntry[];
+  storageConfigured: boolean;
+}> {
+  const codes = await getTopMaterialCodes();
+  const entries = await resolveTopMaterialEntries(codes);
 
   return {
     entries,
-    max: TOP_MATERIALS_MAX,
     storageConfigured: blobConfigured(),
   };
 }

@@ -7,6 +7,7 @@ import { InvalidMaterialUnitsBanner } from "@/components/stock/invalid-material-
 import { CsvDataPanel } from "@/components/stock/csv-data-panel";
 import { MaterialForm } from "@/components/stock/material-form";
 import { MaterialsList } from "@/components/stock/materials-list";
+import { TopMaterialsSection } from "@/components/stock/top-materials-section";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -20,7 +21,7 @@ import { prisma } from "@/lib/prisma";
 import { requireSessionUser } from "@/lib/auth/session";
 import { listBomMissingMaterials } from "@/lib/stock/bom-missing";
 import { listMaterialsWithInvalidUnits } from "@/lib/stock/material-unit-issues";
-import { ensureStockReferenceData } from "@/lib/stock";
+import { ensureStockReferenceData, listActiveWarehouses, listTopMaterialHomeRows } from "@/lib/stock";
 
 export const dynamic = "force-dynamic";
 
@@ -57,10 +58,13 @@ export default async function MaterialsPage({
       : {}),
   };
 
-  const [total, bomMissing, invalidUnits] = await Promise.all([
+  const [total, bomMissing, invalidUnits, topMaterials, warehouses] =
+    await Promise.all([
     prisma.mrpMaterial.count({ where }),
     listBomMissingMaterials(),
     listMaterialsWithInvalidUnits(),
+    listTopMaterialHomeRows(),
+    listActiveWarehouses(),
   ]);
 
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -227,6 +231,25 @@ export default async function MaterialsPage({
           </CardContent>
         </Card>
       </div>
+
+      <TopMaterialsSection
+        rows={topMaterials}
+        warehouses={warehouses}
+        locale={locale}
+        defaultOpen={topMaterials.length > 0}
+        labels={{
+          title: t("top20Title"),
+          description: t("top20Description"),
+          empty: t("top20Empty"),
+          configure: t("top20Configure"),
+          colMaterial: t("top20ColMaterial"),
+          colQuantity: t("top20ColQuantity"),
+          warehouseAll: t("top20WarehouseAll"),
+          warehouseTotal: t("top20WarehouseTotal"),
+          notCounted: t("top20NotCounted"),
+          unknownCode: t("top20UnknownCode"),
+        }}
+      />
     </div>
   );
 }

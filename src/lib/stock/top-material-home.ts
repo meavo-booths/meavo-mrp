@@ -5,45 +5,46 @@ import {
   getTopMaterialCodes,
   getTopMaterialsDetail,
 } from "@/lib/settings/top-materials";
-import { getDefaultWarehouseId } from "@/lib/stock/seed";
 import {
   getBaselinedPairKeys,
   pairHasBaseline,
 } from "@/lib/stock/stock-baseline";
+import { sumTopMaterialQuantities } from "@/lib/stock/top-material-display";
+import type {
+  TopMaterialHomeRow,
+  TopMaterialWarehouseOption,
+  TopMaterialWarehouseQuantity,
+} from "@/lib/stock/top-material-types";
 
-export type TopMaterialHomeRow = {
-  code: string;
-  materialId: string | null;
-  materialName: string | null;
-  unit: string | null;
-  warehouseName: string;
-  quantity: string | null;
-  hasBaseline: boolean;
-  isShortage: boolean;
-  found: boolean;
-};
+export type {
+  TopMaterialHomeRow,
+  TopMaterialWarehouseOption,
+} from "@/lib/stock/top-material-types";
+
+export async function listActiveWarehouses(): Promise<
+  TopMaterialWarehouseOption[]
+> {
+  return prisma.mrpWarehouse.findMany({
+    where: { isActive: true },
+    orderBy: { name: "asc" },
+    select: { id: true, name: true },
+  });
+}
 
 export async function listTopMaterialHomeRows(): Promise<TopMaterialHomeRow[]> {
   const codes = await getTopMaterialCodes();
   if (codes.length === 0) return [];
 
-  const defaultWarehouseId = await getDefaultWarehouseId();
+  const [detail, baselinedKeys, warehouses, materials] = await Promise.all([
+    getTopMaterialsDetail(),
+    getBaselinedPairKeys(),
+    listActiveWarehouses(),
+    prisma.mrpMaterial.findMany({
+      where: { isActive: true, code: { not: null } },
+      select: { id: true, code: true, name: true, unit: true },
+    }),
+  ]);
 
-  const [detail, baselinedKeys, defaultWarehouse, materials] =
-    await Promise.all([
-      getTopMaterialsDetail(),
-      getBaselinedPairKeys(),
-      prisma.mrpWarehouse.findUnique({
-        where: { id: defaultWarehouseId },
-        select: { name: true },
-      }),
-      prisma.mrpMaterial.findMany({
-        where: { isActive: true, code: { not: null } },
-        select: { id: true, code: true, name: true, unit: true },
-      }),
-    ]);
-
-  const warehouseName = defaultWarehouse?.name ?? "—";
   const entryByCode = new Map(
     detail.entries.map((entry) => [entry.code.toLowerCase(), entry]),
   );
@@ -60,16 +61,35 @@ export async function listTopMaterialHomeRows(): Promise<TopMaterialHomeRow[]> {
     materialIds.length === 0 ?
       []
     : await prisma.mrpStockBalance.findMany({
-        where: {
-          warehouseId: defaultWarehouseId,
-          materialId: { in: materialIds },
-        },
-        select: { materialId: true, quantity: true },
+        where: { materialId: { in: materialIds } },
+        select: { warehouseId: true, materialId: true, quantity: true },
       });
 
-  const balanceByMaterialId = new Map(
-    balances.map((row) => [row.materialId, row.quantity.toString()]),
+  const balanceByPair = new Map(
+    balances.map((row) => [
+      `${row.materialId}\u0000${row.warehouseId}`,
+      row.quantity.toString(),
+    ]),
   );
+
+  function buildWarehouseQuantities(
+    materialId: string,
+  ): TopMaterialWarehouseQuantity[] {
+    return warehouses.map((warehouse) => {
+      const quantity =
+        balanceByPair.get(`${materialId}\u0000${warehouse.id}`) ?? null;
+      return {
+        warehouseId: warehouse.id,
+        warehouseName: warehouse.name,
+        quantity,
+        hasBaseline: pairHasBaseline(
+          baselinedKeys,
+          warehouse.id,
+          materialId,
+        ),
+      };
+    });
+  }
 
   return codes.map((code) => {
     const entry = entryByCode.get(code.toLowerCase());
@@ -79,33 +99,18 @@ export async function listTopMaterialHomeRows(): Promise<TopMaterialHomeRow[]> {
         materialId: entry?.materialId ?? null,
         materialName: entry?.name ?? null,
         unit: null,
-        warehouseName,
-        quantity: null,
-        hasBaseline: false,
-        isShortage: false,
         found: false,
+        warehouses: [],
       };
     }
-
-    const hasBaseline = pairHasBaseline(
-      baselinedKeys,
-      defaultWarehouseId,
-      entry.materialId,
-    );
-    const quantity = balanceByMaterialId.get(entry.materialId) ?? null;
-    const isShortage =
-      hasBaseline && quantity != null && Number(quantity) <= 0;
 
     return {
       code,
       materialId: entry.materialId,
       materialName: entry.name,
       unit: unitByMaterialId.get(entry.materialId) ?? null,
-      warehouseName,
-      quantity,
-      hasBaseline,
-      isShortage,
       found: true,
+      warehouses: buildWarehouseQuantities(entry.materialId),
     };
   });
 }
@@ -116,13 +121,16 @@ export async function getTopMaterialHomeStats(): Promise<{
   shortages: number;
 }> {
   const rows = await listTopMaterialHomeRows();
-  const baselined = rows.filter((row) => row.found && row.hasBaseline);
+  const foundRows = rows.filter((row) => row.found);
+  const baselined = foundRows.filter((row) =>
+    row.warehouses.some((warehouse) => warehouse.hasBaseline),
+  );
   const tracked = baselined.filter(
-    (row) => row.quantity != null && Number(row.quantity) > 0,
+    (row) => sumTopMaterialQuantities(row.warehouses) > 0,
   ).length;
 
   return {
-    total: rows.filter((row) => row.found).length,
+    total: foundRows.length,
     tracked,
     shortages: baselined.length - tracked,
   };

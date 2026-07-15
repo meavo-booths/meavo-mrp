@@ -5,7 +5,6 @@ import { requireAppAdmin, requireApiUser } from "@/lib/api/guard";
 import {
   normalizeMaterialCodeList,
   parseMaterialCodeList,
-  TOP_MATERIALS_MAX,
 } from "@/lib/settings/parse-code-list";
 import {
   getTopMaterialsDetail,
@@ -40,13 +39,6 @@ export async function PUT(request: Request) {
     body.paste !== undefined ?
       parseMaterialCodeList(body.paste)
     : normalizeMaterialCodeList(body.codes ?? []);
-
-  if (codes.length > TOP_MATERIALS_MAX) {
-    return NextResponse.json(
-      { error: `Maximum ${TOP_MATERIALS_MAX} codes allowed` },
-      { status: 400 },
-    );
-  }
 
   try {
     const saved = await setTopMaterialCodes(codes, user.id);

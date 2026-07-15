@@ -3,9 +3,13 @@ export { recordInventoryCount } from "./inventory";
 export { listBalances, getBalanceStats } from "./balances";
 export {
   getTopMaterialHomeStats,
+  listActiveWarehouses,
   listTopMaterialHomeRows,
-  type TopMaterialHomeRow,
 } from "./top-material-home";
+export type {
+  TopMaterialHomeRow,
+  TopMaterialWarehouseOption,
+} from "./top-material-types";
 export {
   deriveBoothMarket,
   resolveBomLines,

@@ -110,7 +110,6 @@ export default async function SettingsPage({
               addButton: t("topMaterials.addButton"),
               listLabel: t("topMaterials.listLabel"),
               listEmpty: t("topMaterials.listEmpty"),
-              listCount: t("topMaterials.listCount"),
               unknownCode: t("topMaterials.unknownCode"),
               moveUp: t("topMaterials.moveUp"),
               moveDown: t("topMaterials.moveDown"),
