@@ -2,6 +2,11 @@ export { applyMovement, applyMovements } from "./movements";
 export { recordInventoryCount } from "./inventory";
 export { listBalances, getBalanceStats } from "./balances";
 export {
+  getTopMaterialHomeStats,
+  listTopMaterialHomeRows,
+  type TopMaterialHomeRow,
+} from "./top-material-home";
+export {
   deriveBoothMarket,
   resolveBomLines,
   validateBomConflicts,

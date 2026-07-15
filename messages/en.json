@@ -38,6 +38,7 @@
     "inventory": "Inventory",
     "batches": "Batches",
     "recipes": "Recipes",
+    "settings": "Settings",
     "scan": "Scan",
     "documents": "Documents",
     "admin": "Admin",
@@ -62,12 +63,20 @@
     "balancesDescription": "Current quantities per warehouse (Aksakovo default for batches).",
     "balancesEmpty": "No balances yet. Add materials, then record a receipt or inventory count.",
     "balancesShowingLowest": "Showing {shown} of {total} balances — lowest quantities first.",
+    "topMaterialsTitle": "Top materials",
+    "topMaterialsDescription": "On-hand stock for your configured priority materials.",
+    "topMaterialsManageHint": "Manage the list in",
+    "topMaterialsManageLink": "Settings",
+    "topMaterialsEmpty": "Add material codes in Settings to populate this list.",
+    "topMaterialNotCounted": "Not counted",
+    "topMaterialUnknown": "Unknown code",
     "colMaterial": "Material",
     "colWarehouse": "Warehouse",
     "colQuantity": "Quantity",
     "sheetsNote": "Sync with the „Статус на партиди“ sheet will activate after Google service account setup.",
     "stats": {
       "materials": "Balance rows",
+      "topMaterials": "Top materials",
       "tracked": "Qty > 0",
       "shortages": "Shortages (≤ 0)"
     }
@@ -374,6 +383,34 @@
     "localHelp": "20% Bulgarian VAT charged by the supplier — standard input VAT.",
     "euHelp": "Reverse-charge VAT (Protocol per art. 117 of VAT Act).",
     "non_euHelp": "Import — customs duty and import VAT at clearance; customs declaration (MRN) required."
+  },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "Configure shortcuts and preferences for the stock team.",
+    "topMaterials": {
+      "title": "Top 20 materials",
+      "description": "Priority material codes shown on the home page. Paste a list or add codes one by one.",
+      "pasteLabel": "Paste codes",
+      "pastePlaceholder": "0114\n0138\n0142",
+      "pasteHelp": "Separate codes with commas, semicolons, or new lines. Up to 20 codes.",
+      "applyPaste": "Apply pasted list",
+      "addLabel": "Add code",
+      "addPlaceholder": "Search or type material code",
+      "addButton": "Add",
+      "listLabel": "Current list",
+      "listEmpty": "No priority materials configured yet.",
+      "listCount": "{count} / 20",
+      "unknownCode": "Not found in Materials",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "remove": "Remove",
+      "save": "Save list",
+      "saving": "Saving…",
+      "saved": "Saved",
+      "error": "Could not save",
+      "readOnly": "Only admins can edit the top materials list.",
+      "storageUnavailable": "Storage is not configured on this environment — contact an admin."
+    }
   },
   "admin": {
     "zeron": {

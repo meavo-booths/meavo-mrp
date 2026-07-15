@@ -12,6 +12,7 @@ import {
   Home,
   Package,
   ScrollText,
+  Settings,
   Truck,
   Zap,
 } from "lucide-react";
@@ -51,6 +52,7 @@ export function Header() {
     { href: "/inventory", label: t("inventory"), icon: ClipboardList },
     { href: "/batches", label: t("batches"), icon: Factory },
     { href: "/recipes", label: t("recipes"), icon: ScrollText },
+    { href: "/settings", label: t("settings"), icon: Settings },
   ];
 
   const legacyItems = scannerOn
