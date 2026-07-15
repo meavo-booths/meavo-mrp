@@ -176,11 +176,44 @@ Zeron has a specific column ordering, update
 
 ## Reply log
 
-> _Replace this section with Zeron's actual answer when it arrives._
+```
+Date received: 2026-07-13
+Replied by:    Zeron dev team
+Summary:       Added nomenclature marker „Получаване - проследяване”; requested our
+               inbound endpoint URL + auth (user/password or token). Outbound API for
+               creating purchase documents not yet documented.
+Attachments:   —
+```
+
+### Inbound webhook (ready to share with Zeron)
+
+Production endpoint (after deploy + env vars set on Vercel):
 
 ```
-Date received: ____________
-Replied by:    ____________
-Summary:       ____________
-Attachments:   ____________ (place under docs/zeron/ if any)
+POST https://mrp.meavo.app/api/zeron/inbound
 ```
+
+**Authentication** — configure on Vercel, then share one of:
+
+| Method | Header | Value |
+| --- | --- | --- |
+| Token (preferred) | `Authorization` | `Bearer <ZERON_WEBHOOK_TOKEN>` |
+| Basic auth | `Authorization` | `Basic <base64(user:password)>` |
+
+Generate a token locally:
+
+```bash
+openssl rand -hex 32
+```
+
+Set on Vercel → Environment Variables:
+
+- `ZERON_WEBHOOK_TOKEN` — long random hex string, **or**
+- `ZERON_WEBHOOK_USER` + `ZERON_WEBHOOK_PASSWORD`
+
+**Request body:** JSON or XML (stored as-is until schema is confirmed).
+
+**Success response:** `200` with `{ "ok": true, "id": "<uuid>", "receivedAt": "<ISO8601>" }`.
+
+Route: `src/app/api/zeron/inbound/route.ts` · payloads archived under
+`mrp/zeron-inbound/` in Vercel Blob when `BLOB_READ_WRITE_TOKEN` is set.

@@ -27,6 +27,11 @@ const ServerEnvSchema = z.object({
   ZERON_API_BASE_URL: z.string().optional(),
   ZERON_API_KEY: z.string().optional(),
   ZERON_EXPORT_EMAIL: z.string().optional(),
+  /** Bearer token Zeron sends as `Authorization: Bearer …` on inbound webhooks. */
+  ZERON_WEBHOOK_TOKEN: z.string().min(16).optional(),
+  /** HTTP Basic credentials (alternative to token) for inbound webhooks. */
+  ZERON_WEBHOOK_USER: z.string().min(1).optional(),
+  ZERON_WEBHOOK_PASSWORD: z.string().min(8).optional(),
 
   GOOGLE_SHEETS_MASTER_ID: z.string().optional(),
   GOOGLE_SERVICE_ACCOUNT_JSON: z.string().optional(),
