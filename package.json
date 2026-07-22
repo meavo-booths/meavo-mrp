@@ -19,7 +19,7 @@
   "dependencies": {
     "@google/genai": "^1.27.0",
     "@hookform/resolvers": "^3.9.1",
-    "@meavo/db": "github:meavo-booths/meavo-db#v0.16.0",
+    "@meavo/db": "github:meavo-booths/meavo-db#v0.26.0",
     "@prisma/client": "^6.1.0",
     "@radix-ui/react-dialog": "^1.1.6",
     "@radix-ui/react-dropdown-menu": "^2.1.6",

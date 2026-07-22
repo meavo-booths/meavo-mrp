@@ -44,6 +44,7 @@ Roles live in `MrpUserProfile.role`, loaded by `getSessionUser()` (`src/lib/auth
 | Change | Domain module | API route | Notes |
 |--------|---------------|-----------|-------|
 | Receive stock (manual/invoice) | `src/lib/stock/movements.ts` `applyMovement()` | `POST /api/stock/receipt` | Optional invoice number in metadata |
+| RP Ready materials deduct | `src/lib/stock/rp-deductions.ts` `postRpDeductions()` | `POST /api/stock/rp-deduct` | Session or `RP_MRP_DEDUCT_SECRET`; `production_out` |
 | Inventory count | `src/lib/stock/inventory.ts`, `inventory-batch.ts` | `POST /api/stock/inventory` | Writes `MrpInventoryCount` + variance movement |
 | Create/edit material | `src/lib/import/materials.ts`, direct Prisma | `POST /api/materials`, `PATCH /api/materials/[id]` | `code` unique when set |
 | CSV import (materials, elements, BOM, opening stock) | `src/lib/import/` | `POST /api/import/*` | Templates + exports under the same group |

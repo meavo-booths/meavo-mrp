@@ -36,6 +36,8 @@ const ServerEnvSchema = z.object({
   GOOGLE_SHEETS_MASTER_ID: z.string().optional(),
   GOOGLE_SERVICE_ACCOUNT_JSON: z.string().optional(),
   CRON_SECRET: z.string().optional(),
+  /** Shared with meavo-rp for POST /api/stock/rp-deduct Bearer auth. */
+  RP_MRP_DEDUCT_SECRET: z.string().min(16).optional(),
 });
 
 export type ServerEnv = z.infer<typeof ServerEnvSchema>;

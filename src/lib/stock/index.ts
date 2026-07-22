@@ -21,3 +21,11 @@ export {
   getDefaultWarehouseId,
   DEFAULT_WAREHOUSE_CODE,
 } from "./seed";
+export {
+  postRpDeductions,
+  listReadyUndeductedLines,
+  deriveRpBoothMarket,
+  reviewGroupToWarehouseAlias,
+  expandBoothModelName,
+} from "./rp-deductions";
+export type { RpDeductionResult, RpDeductionLineResult } from "./rp-deductions";

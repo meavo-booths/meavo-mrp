@@ -15,8 +15,8 @@ importers:
         specifier: ^3.9.1
         version: 3.9.1(react-hook-form@7.75.0(react@19.2.4))
       '@meavo/db':
-        specifier: github:meavo-booths/meavo-db#v0.16.0
-        version: https://codeload.github.com/meavo-booths/meavo-db/tar.gz/6c3c876b6a08b91a8619328569607d2f517607a0
+        specifier: github:meavo-booths/meavo-db#v0.26.0
+        version: https://codeload.github.com/meavo-booths/meavo-db/tar.gz/f68b51169450128ed204602ace1c3cfeed333093(prisma@6.19.3(typescript@5.9.3))(typescript@5.9.3)
       '@prisma/client':
         specifier: ^6.1.0
         version: 6.19.3(prisma@6.19.3(typescript@5.9.3))(typescript@5.9.3)
@@ -512,9 +512,9 @@ packages:
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
 
-  '@meavo/db@https://codeload.github.com/meavo-booths/meavo-db/tar.gz/6c3c876b6a08b91a8619328569607d2f517607a0':
-    resolution: {gitHosted: true, integrity: sha512-pAaYLNxl3esXOTslERrFB/hF3Y/xl5bWhpyBJyHLJkIgCag6hHTShjrn0fJQTC9ICqxjdTqd0jRYrvIXU5zKTQ==, tarball: https://codeload.github.com/meavo-booths/meavo-db/tar.gz/6c3c876b6a08b91a8619328569607d2f517607a0}
-    version: 0.16.0
+  '@meavo/db@https://codeload.github.com/meavo-booths/meavo-db/tar.gz/f68b51169450128ed204602ace1c3cfeed333093':
+    resolution: {gitHosted: true, integrity: sha512-3LgId9BTyXFZHfLQgH6uks1sgLzPPhEYkyGANQnPJTX25MC7yf2WRTrn5K/ZKQKAnrLxWyM7IzcWkt0UBGFlRg==, tarball: https://codeload.github.com/meavo-booths/meavo-db/tar.gz/f68b51169450128ed204602ace1c3cfeed333093}
+    version: 0.26.0
 
   '@napi-rs/canvas-android-arm64@0.1.100':
     resolution: {integrity: sha512-hjhCKhntPv9+t4ckHymdx0phYNcVW+GKQR6Lzw2zE+pOVjOplSmtx9nNNknTjbEDLcuLZqA1y8ufKg1XfgftzQ==}
@@ -3654,7 +3654,12 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  '@meavo/db@https://codeload.github.com/meavo-booths/meavo-db/tar.gz/6c3c876b6a08b91a8619328569607d2f517607a0': {}
+  '@meavo/db@https://codeload.github.com/meavo-booths/meavo-db/tar.gz/f68b51169450128ed204602ace1c3cfeed333093(prisma@6.19.3(typescript@5.9.3))(typescript@5.9.3)':
+    dependencies:
+      '@prisma/client': 6.19.3(prisma@6.19.3(typescript@5.9.3))(typescript@5.9.3)
+    transitivePeerDependencies:
+      - prisma
+      - typescript
 
   '@napi-rs/canvas-android-arm64@0.1.100':
     optional: true
