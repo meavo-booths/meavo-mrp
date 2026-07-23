@@ -66,30 +66,11 @@ type Selection = {
   availableMarkets: Array<"default" | "US">;
 };
 
-function CompactTable({
-  children,
-  className,
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <div
-      className={cn(
-        "overflow-x-auto rounded-lg border border-border/70 bg-background/50",
-        className,
-      )}
-    >
-      <table className="w-full text-xs">{children}</table>
-    </div>
-  );
-}
-
 function formatMoney(value: number | null): string {
   if (value == null) return "—";
   return new Intl.NumberFormat("bg-BG", {
     minimumFractionDigits: 2,
-    maximumFractionDigits: 4,
+    maximumFractionDigits: 2,
   }).format(value);
 }
 
@@ -204,23 +185,23 @@ function CostDetail({
     (data.colour !== selection.colour || data.market !== selection.market);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-3">
         <Button
           variant="ghost"
           size="sm"
-          className="-ml-2 h-8 gap-1.5 px-2"
+          className="-ml-2 h-9 gap-1.5 px-2"
           onClick={onBack}
         >
-          <ArrowLeft className="h-3.5 w-3.5" />
+          <ArrowLeft className="h-4 w-4" />
           {labels.back}
         </Button>
-        <h2 className="text-xl font-semibold tracking-tight">{modelName}</h2>
+        <h2 className="text-2xl font-semibold tracking-tight">{modelName}</h2>
       </div>
 
-      <div className="flex flex-wrap items-end gap-3 rounded-xl border border-border bg-card px-3 py-2.5">
-        <div className="min-w-[10rem] flex-1 sm:max-w-[14rem]">
-          <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+      <div className="flex flex-wrap items-end gap-4 rounded-xl border border-border bg-card px-4 py-3.5">
+        <div className="min-w-[12rem] flex-1 sm:max-w-[16rem]">
+          <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
             {labels.colour}
           </p>
           <Select
@@ -234,7 +215,7 @@ function CostDetail({
             }
             disabled={!selection || availableColours.length === 0}
           >
-            <SelectTrigger className="h-8 text-xs">
+            <SelectTrigger className="h-10 text-sm">
               <SelectValue placeholder={labels.noColourOption} />
             </SelectTrigger>
             <SelectContent>
@@ -251,8 +232,8 @@ function CostDetail({
           </Select>
         </div>
 
-        <div className="min-w-[10rem] flex-1 sm:max-w-[14rem]">
-          <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+        <div className="min-w-[12rem] flex-1 sm:max-w-[16rem]">
+          <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
             {labels.market}
           </p>
           <Select
@@ -264,7 +245,7 @@ function CostDetail({
             }
             disabled={!selection}
           >
-            <SelectTrigger className="h-8 text-xs">
+            <SelectTrigger className="h-10 text-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -279,7 +260,7 @@ function CostDetail({
         </div>
 
         {data ? (
-          <p className="pb-0.5 text-xs text-muted-foreground">
+          <p className="pb-2 text-sm text-muted-foreground">
             {data.materials.length} {labels.materialCount}
           </p>
         ) : null}
@@ -290,36 +271,36 @@ function CostDetail({
       ) : null}
 
       {showSkeleton ? (
-        <div className="space-y-3 rounded-xl border border-border bg-card p-4">
-          <div className="h-16 animate-pulse rounded-md bg-muted" />
-          <div className="h-40 animate-pulse rounded-md bg-muted/70" />
+        <div className="space-y-3 rounded-xl border border-border bg-card p-5">
+          <div className="h-20 animate-pulse rounded-md bg-muted" />
+          <div className="h-56 animate-pulse rounded-md bg-muted/70" />
           <p className="text-sm text-muted-foreground">{labels.loading}</p>
         </div>
       ) : null}
 
       {data ? (
         <>
-          <div className="grid gap-2 sm:grid-cols-2">
-            <div className="rounded-xl border border-border bg-card px-3 py-2.5">
-              <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-xl border border-border bg-card px-5 py-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 {labels.totalAverage}
               </p>
-              <p className="mt-1 text-lg font-semibold tabular-nums">
+              <p className="mt-2 text-3xl font-semibold tracking-tight tabular-nums">
                 {formatMoney(data.totals.averageCost)}
               </p>
             </div>
-            <div className="rounded-xl border border-border bg-card px-3 py-2.5">
-              <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            <div className="rounded-xl border border-primary/25 bg-primary/5 px-5 py-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 {labels.totalLatest}
               </p>
-              <p className="mt-1 text-lg font-semibold tabular-nums">
+              <p className="mt-2 text-3xl font-semibold tracking-tight tabular-nums text-primary">
                 {formatMoney(data.totals.latestCost)}
               </p>
             </div>
           </div>
 
           {data.totals.missingPriceCount > 0 ? (
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               {labels.missingPrices.replace(
                 "{count}",
                 String(data.totals.missingPriceCount),
@@ -327,88 +308,104 @@ function CostDetail({
             </p>
           ) : null}
 
-          <section className={cn("space-y-1.5", stale && "opacity-60")}>
+          <section className={cn("space-y-3", stale && "opacity-60")}>
             <div>
-              <h3 className="text-sm font-semibold">{labels.recipeTitle}</h3>
-              <p className="text-[11px] text-muted-foreground">
+              <h3 className="text-base font-semibold">{labels.recipeTitle}</h3>
+              <p className="mt-0.5 text-sm text-muted-foreground">
                 {labels.recipeDescription}
               </p>
             </div>
-            <CompactTable>
-              <thead className="sticky top-0 z-10 bg-card">
-                <tr className="border-b text-left text-muted-foreground">
-                  <th className="w-8 px-2 py-1 font-medium">#</th>
-                  <th className="px-2 py-1 font-medium">
-                    {labels.columns.material}
-                  </th>
-                  <th className="px-2 py-1 text-right font-medium">
-                    {labels.columns.qty}
-                  </th>
-                  <th className="px-2 py-1 text-right font-medium">
-                    {labels.columns.avgUnit}
-                  </th>
-                  <th className="px-2 py-1 text-right font-medium">
-                    {labels.columns.latestUnit}
-                  </th>
-                  <th className="px-2 py-1 text-right font-medium">
-                    {labels.columns.avgLine}
-                  </th>
-                  <th className="px-2 py-1 text-right font-medium">
-                    {labels.columns.latestLine}
-                  </th>
-                  <th className="px-2 py-1 font-medium">
-                    {labels.columns.panels}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.materials.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={8}
-                      className="px-2 py-3 text-muted-foreground"
-                    >
-                      {labels.empty}
-                    </td>
+
+            <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
+              <table className="w-full min-w-[56rem] border-collapse text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-muted/50 text-left">
+                    <th className="w-12 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      #
+                    </th>
+                    <th className="min-w-[14rem] px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      {labels.columns.material}
+                    </th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      {labels.columns.qty}
+                    </th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      {labels.columns.avgUnit}
+                    </th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      {labels.columns.latestUnit}
+                    </th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      {labels.columns.avgLine}
+                    </th>
+                    <th className="bg-primary/5 px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-primary">
+                      {labels.columns.latestLine}
+                    </th>
+                    <th className="min-w-[10rem] px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      {labels.columns.panels}
+                    </th>
                   </tr>
-                ) : (
-                  data.materials.map((item, index) => (
-                    <tr
-                      key={item.materialCode}
-                      className="border-b border-border/40 last:border-0 odd:bg-muted/20"
-                    >
-                      <td className="px-2 py-0.5 tabular-nums text-muted-foreground">
-                        {index + 1}
-                      </td>
-                      <td className="px-2 py-0.5">
-                        <span className="font-medium">{item.materialCode}</span>
-                        <span className="ml-1.5 text-muted-foreground">
-                          {item.materialName}
-                        </span>
-                      </td>
-                      <td className="px-2 py-0.5 text-right tabular-nums">
-                        {item.quantityLabel}
-                      </td>
-                      <td className="px-2 py-0.5 text-right tabular-nums">
-                        {formatMoney(item.averageUnitCost)}
-                      </td>
-                      <td className="px-2 py-0.5 text-right tabular-nums">
-                        {formatMoney(item.latestUnitCost)}
-                      </td>
-                      <td className="px-2 py-0.5 text-right tabular-nums">
-                        {formatMoney(item.averageLineCost)}
-                      </td>
-                      <td className="px-2 py-0.5 text-right font-medium tabular-nums">
-                        {formatMoney(item.latestLineCost)}
-                      </td>
-                      <td className="max-w-[12rem] truncate px-2 py-0.5 text-muted-foreground">
-                        {item.panels.join(", ")}
+                </thead>
+                <tbody>
+                  {data.materials.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={8}
+                        className="px-4 py-8 text-center text-muted-foreground"
+                      >
+                        {labels.empty}
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </CompactTable>
+                  ) : (
+                    data.materials.map((item, index) => {
+                      const missingPrice =
+                        item.averageUnitCost == null &&
+                        item.latestUnitCost == null;
+                      return (
+                        <tr
+                          key={item.materialCode}
+                          className={cn(
+                            "border-b border-border/60 last:border-0",
+                            index % 2 === 1 && "bg-muted/25",
+                            missingPrice && "opacity-70",
+                          )}
+                        >
+                          <td className="px-4 py-3 tabular-nums text-muted-foreground">
+                            {index + 1}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="font-semibold tabular-nums tracking-tight">
+                              {item.materialCode}
+                            </div>
+                            <div className="mt-0.5 text-sm leading-snug text-muted-foreground">
+                              {item.materialName}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-right tabular-nums">
+                            {item.quantityLabel}
+                          </td>
+                          <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
+                            {formatMoney(item.averageUnitCost)}
+                          </td>
+                          <td className="px-4 py-3 text-right tabular-nums">
+                            {formatMoney(item.latestUnitCost)}
+                          </td>
+                          <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
+                            {formatMoney(item.averageLineCost)}
+                          </td>
+                          <td className="bg-primary/5 px-4 py-3 text-right text-base font-semibold tabular-nums text-primary">
+                            {formatMoney(item.latestLineCost)}
+                          </td>
+                          <td className="max-w-[14rem] px-4 py-3 text-sm leading-snug text-muted-foreground">
+                            {item.panels.join(", ")}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
           </section>
         </>
       ) : null}
@@ -431,30 +428,32 @@ export function BoothCostBrowser({ models, selectedModel, labels }: Props) {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <div>
-        <h2 className="text-base font-semibold">{labels.selectModel}</h2>
-        <p className="text-xs text-muted-foreground">{labels.selectModelHint}</p>
+        <h2 className="text-lg font-semibold">{labels.selectModel}</h2>
+        <p className="mt-0.5 text-sm text-muted-foreground">
+          {labels.selectModelHint}
+        </p>
       </div>
 
       {models.length === 0 ? (
         <p className="text-sm text-muted-foreground">{labels.noModels}</p>
       ) : (
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {models.map((model) => (
             <Link
               key={model.name}
               href={`/costs?model=${encodeURIComponent(model.name)}`}
-              className="group flex items-center justify-between rounded-xl border border-border bg-card px-3 py-2.5 shadow-sm transition-colors hover:bg-secondary"
+              className="group flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3.5 shadow-sm transition-colors hover:bg-secondary"
             >
               <div className="min-w-0">
-                <p className="truncate font-semibold">{model.name}</p>
-                <p className="text-[11px] text-muted-foreground">
+                <p className="truncate text-base font-semibold">{model.name}</p>
+                <p className="mt-0.5 text-sm text-muted-foreground">
                   {model.panelCount} {labels.panels} · {model.bomLineCount}{" "}
                   {labels.bomLines}
                 </p>
               </div>
-              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+              <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
             </Link>
           ))}
         </div>
