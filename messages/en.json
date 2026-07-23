@@ -183,10 +183,10 @@
       "columns": {
         "material": "Material",
         "qty": "Qty",
-        "avgUnit": "Avg unit",
-        "latestUnit": "Latest unit",
-        "avgLine": "Avg line",
-        "latestLine": "Latest line",
+        "avgUnit": "Avg unit cost",
+        "latestUnit": "Latest unit cost",
+        "avgLine": "Avg cost",
+        "latestLine": "Latest cost",
         "panels": "Panels"
       }
     },

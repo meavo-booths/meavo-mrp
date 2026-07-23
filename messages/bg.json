@@ -183,10 +183,10 @@
       "columns": {
         "material": "Материал",
         "qty": "Кол.",
-        "avgUnit": "Ср. ед.",
-        "latestUnit": "Посл. ед.",
-        "avgLine": "Ср. ред",
-        "latestLine": "Посл. ред",
+        "avgUnit": "Ср. ед. цена",
+        "latestUnit": "Посл. ед. цена",
+        "avgLine": "Ср. цена",
+        "latestLine": "Посл. цена",
         "panels": "Панели"
       }
     },
