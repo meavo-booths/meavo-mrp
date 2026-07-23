@@ -8,19 +8,15 @@ export const dynamic = "force-dynamic";
 
 export default async function CostsPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ model?: string }>;
 }) {
   const { locale } = await params;
-  const { model: modelParam } = await searchParams;
   setRequestLocale(locale);
   await requireSessionUser();
 
   const t = await getTranslations("stock.costs");
   const models = await listBoothModelsWithRecipes();
-  const selectedModel = modelParam?.trim() || null;
 
   return (
     <div className="mx-auto w-full max-w-screen-2xl px-4 py-6 sm:px-6">
@@ -31,22 +27,14 @@ export default async function CostsPage({
 
       <BoothCostBrowser
         models={models}
-        selectedModel={selectedModel}
         labels={{
-          back: t("back"),
-          selectModel: t("selectModel"),
-          selectModelHint: t("selectModelHint"),
-          panels: t("panels"),
-          bomLines: t("bomLines"),
+          model: t("model"),
+          colour: t("colour"),
           noModels: t("empty"),
+          noColourOption: t("noColourOption"),
           loading: t("loading"),
           loadError: t("loadError"),
           notFound: t("notFound"),
-          colour: t("colour"),
-          market: t("market"),
-          marketDomestic: t("marketDomestic"),
-          marketUs: t("marketUs"),
-          noColourOption: t("noColourOption"),
           materialCount: t("materialCount"),
           totalAverage: t("totalAverage"),
           totalLatest: t("totalLatest"),

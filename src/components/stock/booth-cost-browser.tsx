@@ -1,10 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ArrowLeft, ChevronRight } from "lucide-react";
 
-import { Link, useRouter } from "@/i18n/navigation";
-import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -12,7 +9,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { BoothMarket } from "@/lib/import/schemas";
 import type { BoothMaterialCostResult } from "@/lib/stock/booth-material-cost";
 import type {
   BoothModelRecipe,
@@ -20,21 +16,17 @@ import type {
 } from "@/lib/stock/bom-recipe-view";
 import { cn } from "@/lib/utils/cn";
 
+const DEFAULT_MODEL = "Soho";
+const DEFAULT_COLOUR = "Pure White";
+
 type Labels = {
-  back: string;
-  selectModel: string;
-  selectModelHint: string;
-  panels: string;
-  bomLines: string;
+  model: string;
+  colour: string;
   noModels: string;
+  noColourOption: string;
   loading: string;
   loadError: string;
   notFound: string;
-  colour: string;
-  market: string;
-  marketDomestic: string;
-  marketUs: string;
-  noColourOption: string;
   materialCount: string;
   totalAverage: string;
   totalLatest: string;
@@ -55,15 +47,7 @@ type Labels = {
 
 type Props = {
   models: BoothModelSummary[];
-  selectedModel: string | null;
   labels: Labels;
-};
-
-type Selection = {
-  colour: string | null;
-  market: BoothMarket;
-  availableColours: string[];
-  availableMarkets: Array<"default" | "US">;
 };
 
 function formatMoney(value: number | null): string {
@@ -74,91 +58,84 @@ function formatMoney(value: number | null): string {
   }).format(value);
 }
 
-function defaultRecipeColour(colours: string[]): string | null {
-  if (colours.length === 0) return null;
-  return colours.find((c) => c === "Pure White") ?? colours[0] ?? null;
+function pickDefaultModel(models: BoothModelSummary[]): string | null {
+  if (models.length === 0) return null;
+  return models.find((m) => m.name === DEFAULT_MODEL)?.name ?? models[0]!.name;
 }
 
-function CostDetail({
-  modelName,
-  labels,
-  onBack,
-}: {
-  modelName: string;
-  labels: Labels;
-  onBack: () => void;
-}) {
-  const [selection, setSelection] = React.useState<Selection | null>(null);
+function pickDefaultColour(colours: string[]): string | null {
+  if (colours.length === 0) return null;
+  return colours.find((c) => c === DEFAULT_COLOUR) ?? colours[0] ?? null;
+}
+
+export function BoothCostBrowser({ models, labels }: Props) {
+  const [modelName, setModelName] = React.useState<string | null>(() =>
+    pickDefaultModel(models),
+  );
+  const [colour, setColour] = React.useState<string | null>(DEFAULT_COLOUR);
+  const [availableColours, setAvailableColours] = React.useState<string[]>([]);
   const [data, setData] = React.useState<BoothMaterialCostResult | null>(null);
-  const [status, setStatus] = React.useState<
-    "bootstrapping" | "loading" | "ready" | "error"
-  >("bootstrapping");
+  const [status, setStatus] = React.useState<"idle" | "loading" | "ready" | "error">(
+    models.length === 0 ? "idle" : "loading",
+  );
   const [loadError, setLoadError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
+    if (!modelName) return;
+
     const controller = new AbortController();
 
     void (async () => {
       try {
-        const res = await fetch(
+        const recipeRes = await fetch(
           `/api/recipes/${encodeURIComponent(modelName)}`,
           { signal: controller.signal },
         );
-        if (!res.ok) {
-          if (res.status === 404) {
+        if (!recipeRes.ok) {
+          if (recipeRes.status === 404) {
             setLoadError(labels.notFound);
             setStatus("error");
+            setData(null);
+            setAvailableColours([]);
             return;
           }
-          throw new Error(`HTTP ${res.status}`);
+          throw new Error(`HTTP ${recipeRes.status}`);
         }
-        const recipe = (await res.json()) as BoothModelRecipe;
+
+        const recipe = (await recipeRes.json()) as BoothModelRecipe;
         if (controller.signal.aborted) return;
-        const availableMarkets =
-          recipe.availableMarkets.length > 0
-            ? recipe.availableMarkets
-            : (["default"] as Array<"default" | "US">);
-        setSelection({
-          colour: defaultRecipeColour(recipe.availableColours),
-          market: availableMarkets.includes("default")
-            ? "default"
-            : (availableMarkets[0] ?? "default"),
-          availableColours: recipe.availableColours,
-          availableMarkets,
-        });
-        setStatus("loading");
-      } catch (err) {
-        if (controller.signal.aborted) return;
-        setLoadError(err instanceof Error ? err.message : labels.loadError);
-        setStatus("error");
-      }
-    })();
 
-    return () => controller.abort();
-  }, [labels.loadError, labels.notFound, modelName]);
+        const colours = recipe.availableColours;
+        setAvailableColours(colours);
 
-  React.useEffect(() => {
-    if (!selection) return;
+        let activeColour = colour;
+        if (!activeColour || !colours.includes(activeColour)) {
+          activeColour = pickDefaultColour(colours);
+          if (activeColour !== colour) {
+            setColour(activeColour);
+            // Colour state change will re-run this effect; skip cost fetch here.
+            return;
+          }
+        }
 
-    const controller = new AbortController();
+        const params = new URLSearchParams({ market: "default" });
+        if (activeColour) params.set("colour", activeColour);
 
-    void (async () => {
-      try {
-        const params = new URLSearchParams({ market: selection.market });
-        if (selection.colour) params.set("colour", selection.colour);
-        const res = await fetch(
+        const costRes = await fetch(
           `/api/recipe-costs/${encodeURIComponent(modelName)}?${params}`,
           { signal: controller.signal },
         );
-        if (!res.ok) {
-          if (res.status === 404) {
+        if (!costRes.ok) {
+          if (costRes.status === 404) {
             setLoadError(labels.notFound);
             setStatus("error");
+            setData(null);
             return;
           }
-          throw new Error(`HTTP ${res.status}`);
+          throw new Error(`HTTP ${costRes.status}`);
         }
-        const json = (await res.json()) as BoothMaterialCostResult;
+
+        const json = (await costRes.json()) as BoothMaterialCostResult;
         if (controller.signal.aborted) return;
         setData(json);
         setLoadError(null);
@@ -167,53 +144,60 @@ function CostDetail({
         if (controller.signal.aborted) return;
         setLoadError(err instanceof Error ? err.message : labels.loadError);
         setStatus("error");
+        setData(null);
       }
     })();
 
     return () => controller.abort();
-  }, [labels.loadError, labels.notFound, modelName, selection]);
+  }, [colour, labels.loadError, labels.notFound, modelName]);
 
-  const colour = selection?.colour ?? null;
-  const market = selection?.market ?? "default";
-  const availableColours = selection?.availableColours ?? [];
-  const availableMarkets = selection?.availableMarkets ?? ["default"];
-  const showSkeleton =
-    status === "bootstrapping" || (status === "loading" && !data);
   const stale =
-    !!data &&
-    !!selection &&
-    (data.colour !== selection.colour || data.market !== selection.market);
+    !!data && (data.modelName !== modelName || data.colour !== colour);
+
+  if (models.length === 0) {
+    return <p className="text-sm text-muted-foreground">{labels.noModels}</p>;
+  }
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center gap-3">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="-ml-2 h-9 gap-1.5 px-2"
-          onClick={onBack}
-        >
-          <ArrowLeft className="h-4 w-4" />
-          {labels.back}
-        </Button>
-        <h2 className="text-2xl font-semibold tracking-tight">{modelName}</h2>
-      </div>
-
       <div className="flex flex-wrap items-end gap-4 rounded-xl border border-border bg-card px-4 py-3.5">
-        <div className="min-w-[12rem] flex-1 sm:max-w-[16rem]">
+        <div className="min-w-[12rem] flex-1 sm:max-w-[18rem]">
+          <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            {labels.model}
+          </p>
+          <Select
+            value={modelName ?? undefined}
+            onValueChange={(v) => {
+              setStatus("loading");
+              setData(null);
+              setColour(DEFAULT_COLOUR);
+              setModelName(v);
+            }}
+          >
+            <SelectTrigger className="h-10 text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {models.map((model) => (
+                <SelectItem key={model.name} value={model.name}>
+                  {model.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="min-w-[12rem] flex-1 sm:max-w-[18rem]">
           <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
             {labels.colour}
           </p>
           <Select
             value={colour ?? "__none__"}
-            onValueChange={(v) =>
-              setSelection((prev) =>
-                prev
-                  ? { ...prev, colour: v === "__none__" ? null : v }
-                  : prev,
-              )
-            }
-            disabled={!selection || availableColours.length === 0}
+            onValueChange={(v) => {
+              setStatus("loading");
+              setColour(v === "__none__" ? null : v);
+            }}
+            disabled={availableColours.length === 0}
           >
             <SelectTrigger className="h-10 text-sm">
               <SelectValue placeholder={labels.noColourOption} />
@@ -232,33 +216,6 @@ function CostDetail({
           </Select>
         </div>
 
-        <div className="min-w-[12rem] flex-1 sm:max-w-[16rem]">
-          <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            {labels.market}
-          </p>
-          <Select
-            value={market}
-            onValueChange={(v) =>
-              setSelection((prev) =>
-                prev ? { ...prev, market: v as BoothMarket } : prev,
-              )
-            }
-            disabled={!selection}
-          >
-            <SelectTrigger className="h-10 text-sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {availableMarkets.includes("default") ? (
-                <SelectItem value="default">{labels.marketDomestic}</SelectItem>
-              ) : null}
-              {availableMarkets.includes("US") ? (
-                <SelectItem value="US">{labels.marketUs}</SelectItem>
-              ) : null}
-            </SelectContent>
-          </Select>
-        </div>
-
         {data ? (
           <p className="pb-2 text-sm text-muted-foreground">
             {data.materials.length} {labels.materialCount}
@@ -270,7 +227,7 @@ function CostDetail({
         <p className="text-sm text-destructive">{loadError}</p>
       ) : null}
 
-      {showSkeleton ? (
+      {!data && status !== "error" ? (
         <div className="space-y-3 rounded-xl border border-border bg-card p-5">
           <div className="h-20 animate-pulse rounded-md bg-muted" />
           <div className="h-56 animate-pulse rounded-md bg-muted/70" />
@@ -409,55 +366,6 @@ function CostDetail({
           </section>
         </>
       ) : null}
-    </div>
-  );
-}
-
-export function BoothCostBrowser({ models, selectedModel, labels }: Props) {
-  const router = useRouter();
-
-  if (selectedModel) {
-    return (
-      <CostDetail
-        key={selectedModel}
-        modelName={selectedModel}
-        labels={labels}
-        onBack={() => router.push("/costs")}
-      />
-    );
-  }
-
-  return (
-    <div className="space-y-4">
-      <div>
-        <h2 className="text-lg font-semibold">{labels.selectModel}</h2>
-        <p className="mt-0.5 text-sm text-muted-foreground">
-          {labels.selectModelHint}
-        </p>
-      </div>
-
-      {models.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{labels.noModels}</p>
-      ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {models.map((model) => (
-            <Link
-              key={model.name}
-              href={`/costs?model=${encodeURIComponent(model.name)}`}
-              className="group flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3.5 shadow-sm transition-colors hover:bg-secondary"
-            >
-              <div className="min-w-0">
-                <p className="truncate text-base font-semibold">{model.name}</p>
-                <p className="mt-0.5 text-sm text-muted-foreground">
-                  {model.panelCount} {labels.panels} · {model.bomLineCount}{" "}
-                  {labels.bomLines}
-                </p>
-              </div>
-              <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-            </Link>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
