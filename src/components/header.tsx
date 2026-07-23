@@ -6,6 +6,7 @@ import { useLocale } from "next-intl";
 import {
   Camera,
   ClipboardList,
+  Calculator,
   Factory,
   FileText,
   Globe,
@@ -52,6 +53,7 @@ export function Header() {
     { href: "/inventory", label: t("inventory"), icon: ClipboardList },
     { href: "/batches", label: t("batches"), icon: Factory },
     { href: "/recipes", label: t("recipes"), icon: ScrollText },
+    { href: "/costs", label: t("costs"), icon: Calculator },
     { href: "/settings", label: t("settings"), icon: Settings },
   ];
 
